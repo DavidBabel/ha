@@ -1,0 +1,35 @@
+# Version: 1.0.1
+# 🧪 to test : add toggle outlet
+# Appartement: Carmes
+blueprint:
+  name: "🔌 Bouton Physique → Toggle Prise"
+  description: "Bascule l'état (ON/OFF) d'une prise via un bouton physique (type Zigbee2MQTT)."
+  domain: automation
+  input:
+    button_action_entity:
+      name: 🖲️ Bouton - Entité action
+      description: "Entité (sensor) qui émet l'action (ex: 'single')."
+      default: sensor.bouton_ventilateurs_macbook_action
+      selector:
+        entity:
+          domain: sensor
+    target_plug:
+      name: 🔌 Prise à piloter
+      description: "La prise (switch) à toggler."
+      default: switch.bureau_prise_toggle_ventilateurs_macbook_outlet
+      selector:
+        entity:
+          domain: switch
+
+mode: single
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input button_action_entity
+    to: "single" # Ajuste si ton bouton utilise un autre état pour le clic simple
+
+action:
+  - service: switch.toggle
+    target:
+      entity_id: !input target_plug
