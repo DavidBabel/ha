@@ -1,5 +1,5 @@
-# Version: 1.1.5
-# 🧪 to test : prevent everything off when doing something else that SHIELD
+# Version: 1.1.6
+# 🧪 to test : update / backup
 # Appartement: Carmes
 #TODO : si source =/= shield, alors ne rien faire
 # Ajouter un bouton pour forcer le scenario d'extinction sur la telecommande et via les webhooks
@@ -7,7 +7,7 @@
 blueprint:
   name: "🎬 Contrôle Cinéma Epson & Shield"
   description: >
-    Version: 1.1.5
+    Version: 1.1.6
     📽️ Allume le projecteur Epson et l’ampli Denon via la Shield ou un bouton Hue,
     et les éteint (double OFF Epson).
 
@@ -221,19 +221,56 @@ action:
           #   target:
           #     entity_id: !input shield_player
           #   continue_on_error: true
-          - choose:
-              - conditions:
-                  - condition: state
-                    entity_id: !input shield_player
-                    state: "on"
-                sequence:
+          # ------------------------------------------------------------------------
+          # Extinction forcée via bouton Hue
+          # Objectif : quand on appuie, on coupe TOUT systématiquement,
+          # sans aucun check (ni sur la source Denon, ni sur l'état de la Shield).
+          # Important : on éteint la Shield EN DERNIER (mode: restart).
+          # ------------------------------------------------------------------------
+          - &shutdown_parallel
+            parallel:
+              - sequence:
+                  - action: cover.close_cover
+                    target:
+                      entity_id: !input projector_screen_cover
+                  - delay:
+                      seconds: 33
+                  - action: cover.stop_cover
+                    target:
+                      entity_id: !input projector_screen_cover
+              - sequence:
                   - action: media_player.turn_off
                     target:
-                      entity_id: !input shield_player
-            default:
-              - action: media_player.turn_on
-                target:
-                  entity_id: !input shield_player
+                      entity_id: !input denon_media_player
+                  - delay: "00:00:07"
+                  - action: switch.turn_off
+                    target:
+                      entity_id: !input epson_switch
+                  - delay: "00:00:01"
+                  - action: switch.turn_off
+                    target:
+                      entity_id: !input epson_switch
+                  - delay: "00:00:01"
+                  - action: switch.turn_off
+                    target:
+                      entity_id: !input epson_switch
+                  - delay: "00:00:01"
+                  - action: switch.turn_off
+                    target:
+                      entity_id: !input epson_switch
+                  - delay: "00:00:01"
+                  - action: switch.turn_off
+                    target:
+                      entity_id: !input epson_switch
+                  - delay: "00:00:01"
+                  - action: switch.turn_off
+                    target:
+                      entity_id: !input epson_switch
+          - &shutdown_shield_off
+            action: media_player.turn_off
+            target:
+              entity_id: !input shield_player
+            continue_on_error: true
       - conditions:
           - condition: trigger
             id: "allumage"
@@ -365,42 +402,6 @@ action:
                   - stop: >-
                       Extinction ignorée : la source Denon n'est pas "{{ denon_shield_source_label }}"
 
-          # Séquence spécifique Epson
-          - parallel:
-              - sequence:
-                  - action: cover.close_cover
-                    target:
-                      entity_id: !input projector_screen_cover
-                  - delay:
-                      seconds: 33
-                  - action: cover.stop_cover
-                    target:
-                      entity_id: !input projector_screen_cover
-              - sequence:
-                  - action: media_player.turn_off
-                    target:
-                      entity_id: !input denon_media_player
-                  - delay: "00:00:07"
-                  - action: switch.turn_off
-                    target:
-                      entity_id: !input epson_switch
-                  - delay: "00:00:01"
-                  - action: switch.turn_off
-                    target:
-                      entity_id: !input epson_switch
-                  - delay: "00:00:01"
-                  - action: switch.turn_off
-                    target:
-                      entity_id: !input epson_switch
-                  - delay: "00:00:01"
-                  - action: switch.turn_off
-                    target:
-                      entity_id: !input epson_switch
-                  - delay: "00:00:01"
-                  - action: switch.turn_off
-                    target:
-                      entity_id: !input epson_switch
-                  - delay: "00:00:01"
-                  - action: switch.turn_off
-                    target:
-                      entity_id: !input epson_switch
+          # Séquence d'arrêt (factorisée via ancres YAML)
+          - *shutdown_parallel
+          - *shutdown_shield_off

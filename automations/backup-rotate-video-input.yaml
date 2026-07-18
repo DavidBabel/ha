@@ -1,0 +1,204 @@
+alias: "📺 Denon : rotation source vidéo (next / previous)"
+description: >
+  Deux webhooks pour faire tourner la source vidéo de l'ampli Denon.
+  - next : SHIELD -> PC -> PlayStation -> Switch -> Switch 2 -> (boucle)
+  - previous : ordre inverse
+
+  Important : ne switch que sur ces 5 sources, dans l'ordre ci-dessus.
+  Le script s'aligne sur les libellés réellement disponibles dans `source_list`
+  (on récupère le libellé EXACT présent dans la liste, selon modèle/firmware/langue).
+
+trigger:
+  # --------------------------------------------------------------------------
+  # Déclencheur : webhook "next"
+  # Méthode : POST
+  # URL (exemple) : /api/webhook/denon-video-input-next
+  # --------------------------------------------------------------------------
+  - platform: webhook
+    allowed_methods:
+      - POST
+    local_only: true
+    webhook_id: denon-video-input-next
+    id: next
+
+  # --------------------------------------------------------------------------
+  # Déclencheur : webhook "previous"
+  # Méthode : POST
+  # URL (exemple) : /api/webhook/denon-video-input-previous
+  # --------------------------------------------------------------------------
+  - platform: webhook
+    allowed_methods:
+      - POST
+    local_only: true
+    webhook_id: denon-video-input-previous
+    id: previous
+
+condition: []
+
+action:
+  # --------------------------------------------------------------------------
+  # Variables de base
+  # - denon_entity : media_player Denon (intégration officielle)
+  # - current_source : source courante (attribut `source`)
+  # - available_sources : liste des sources disponibles (attribut `source_list`)
+  # --------------------------------------------------------------------------
+  - variables:
+      denon_entity: media_player.denon_avr_x2800h
+      current_source: "{{ state_attr(denon_entity, 'source') | default('') | string }}"
+      available_sources: "{{ state_attr(denon_entity, 'source_list') or [] }}"
+
+      # ----------------------------------------------------------------------
+      # Détection des libellés "cibles" dans `source_list`
+      # On cherche un match insensible à la casse, et on renvoie le libellé EXACT
+      # présent dans `source_list`.
+      # ----------------------------------------------------------------------
+      shield_option: >-
+        {% set opts = available_sources %}
+        {% set ns = namespace(match='') %}
+        {% for o in opts %}
+          {% if (o | string | lower) == 'shield' %}
+            {% set ns.match = o %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.match }}
+
+      pc_option: >-
+        {% set opts = available_sources %}
+        {% set ns = namespace(match='') %}
+        {% for o in opts %}
+          {% if (o | string | lower) == 'pc' %}
+            {% set ns.match = o %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.match }}
+
+      playstation_option: >-
+        {% set opts = available_sources %}
+        {% set ns = namespace(match='') %}
+        {% for o in opts %}
+          {% if (o | string | lower) == 'playstation' %}
+            {% set ns.match = o %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.match }}
+
+      switch_option: >-
+        {% set opts = available_sources %}
+        {% set ns = namespace(match='') %}
+        {% for o in opts %}
+          {% if (o | string | lower) == 'switch' %}
+            {% set ns.match = o %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.match }}
+
+      switch2_option: >-
+        {% set opts = available_sources %}
+        {% set ns = namespace(match='') %}
+        {% for o in opts %}
+          {% if (o | string | lower) == 'switch 2' %}
+            {% set ns.match = o %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.match }}
+
+      # ----------------------------------------------------------------------
+      # Liste de rotation (dans l'ordre demandé), en ne gardant que celles
+      # réellement disponibles sur l'ampli.
+      # Note : on stocke en JSON pour éviter les ambiguïtés de typage.
+      # ----------------------------------------------------------------------
+      rotation_list_json: >-
+        {% set ns = namespace(lst=[]) %}
+        {% for item in [shield_option, pc_option, playstation_option, switch_option, switch2_option] %}
+          {% if (item | string | length) > 0 %}
+            {% set ns.lst = ns.lst + [item] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.lst | to_json }}
+
+      # ----------------------------------------------------------------------
+      # Index de la source courante dans la liste de rotation (-1 si absente)
+      # ----------------------------------------------------------------------
+      current_index: >-
+        {% set lst = (rotation_list_json | trim) | from_json(default=[]) %}
+        {% set cur = current_source | lower %}
+        {% set ns = namespace(idx=-1) %}
+        {% for o in lst %}
+          {% if (o | string | lower) == cur %}
+            {% set ns.idx = loop.index0 %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.idx }}
+
+      # ----------------------------------------------------------------------
+      # Prochaines sources (next/previous)
+      # - Si la source courante n'est pas dans la rotation :
+      #   - next -> première source
+      #   - previous -> dernière source
+      # ----------------------------------------------------------------------
+      next_source: >-
+        {% set lst = (rotation_list_json | trim) | from_json(default=[]) %}
+        {% set n = lst | length %}
+        {% if n == 0 %}
+          {{ '' }}
+        {% else %}
+          {% set idx = current_index | int(-1) %}
+          {% if idx == -1 %}
+            {{ lst[0] }}
+          {% else %}
+            {{ lst[(idx + 1) % n] }}
+          {% endif %}
+        {% endif %}
+
+      previous_source: >-
+        {% set lst = (rotation_list_json | trim) | from_json(default=[]) %}
+        {% set n = lst | length %}
+        {% if n == 0 %}
+          {{ '' }}
+        {% else %}
+          {% set idx = current_index | int(-1) %}
+          {% if idx == -1 %}
+            {{ lst[n - 1] }}
+          {% else %}
+            {{ lst[(idx - 1) % n] }}
+          {% endif %}
+        {% endif %}
+
+  - choose:
+      # ----------------------------------------------------------------------
+      # Webhook NEXT
+      # ----------------------------------------------------------------------
+      - conditions:
+          - condition: trigger
+            id: next
+          - condition: template
+            value_template: "{{ next_source | length > 0 }}"
+        sequence:
+          - service: media_player.select_source
+            target:
+              entity_id: "{{ denon_entity }}"
+            data:
+              source: "{{ next_source }}"
+
+      # ----------------------------------------------------------------------
+      # Webhook PREVIOUS
+      # ----------------------------------------------------------------------
+      - conditions:
+          - condition: trigger
+            id: previous
+          - condition: template
+            value_template: "{{ previous_source | length > 0 }}"
+        sequence:
+          - service: media_player.select_source
+            target:
+              entity_id: "{{ denon_entity }}"
+            data:
+              source: "{{ previous_source }}"
+
+mode: single
