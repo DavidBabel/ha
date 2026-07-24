@@ -9,7 +9,7 @@ _Généré automatiquement par post-commit_
 🧪 `auto_power_toggle.yaml` : # 🧪 to test : pending
 🧪 `awtrix_app_date_ticker.yaml` : # 🧪 to test : pending
 ✅ `batteries_check.yaml` : # ✅ working
-🧪 `button_nettoyage_chats.yaml` : # 🧪 to test : update petkit
+🧪 `button_nettoyage_chats.yaml` : # 🧪 to test : update
 🧪 `button_toggle_outlet.yaml` : # 🧪 to test : add toggle outlet
 ✅ `healthcheck_addon_running.yaml` : # ✅ working
 ✅ `healthcheck_capteur_presence.yaml` : # ✅ working
