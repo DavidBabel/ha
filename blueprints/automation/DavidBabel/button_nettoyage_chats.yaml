@@ -1,26 +1,26 @@
-# Version: 2.0.1
+# Version: 2.1.1
 # 🧪 to test : update petkit
 # Appartement: Carmes
 blueprint:
   name: "🐈 Nettoyage Chats: Bouton (Aqara) → Petkit (config libre)"
   description: >
-    Version: 2.0.1
+    Version: 2.1.1
 
     Associe un bouton physique (ex: Aqara, entité "action" single/hold/double) à des boutons
     Petkit choisis directement (intégration Jezza34000/homeassistant_petkit) — plus besoin de
     sélectionner un device, tu configures toi-même quel événement déclenche quel bouton.
 
-    Logique de traitement, dans cet ordre, à chaque clic (single/hold/double) :
+    Logique de traitement, dans cet ordre, à chaque clic (single/hold/double) — les 3 étapes
+    sont indépendantes et s'enchaînent (aucune n'empêche les suivantes) :
 
     1. Déblocage sécurité : si le bouton "continuer" (sortie du mode sécurité bloqué) est
-       disponible (enabled), il est TOUJOURS pressé en premier, avant tout le reste, pour
-       éviter que la machine reste bloquée.
+       disponible (enabled), il est TOUJOURS pressé en premier.
 
-    2. Sortie de maintenance prioritaire : si le bouton "quitter maintenance" est disponible
-       (= la litière est actuellement en mode maintenance), alors n'importe quel clic (single,
-       hold ou double) fait sortir la litière du mode maintenance, et rien d'autre n'est fait.
+    2. Sortie de maintenance : si le bouton "quitter maintenance" est disponible (= la litière
+       est actuellement en mode maintenance), il est pressé pour en sortir.
 
-    3. Sinon (pas en maintenance), on applique le mapping configuré :
+    3. Mapping configuré : dans tous les cas, l'action associée à l'événement reçu est
+       exécutée :
        - état = Événement 1  ⇒ presse Bouton 1
        - état = Événement 2  ⇒ presse Bouton 2
        - état = Événement 3  ⇒ presse Bouton 3 (si configuré)
@@ -116,13 +116,14 @@ blueprint:
           domain: button
 
     # --------------------------------------------------------------------------
-    # Sortie de maintenance (surveillée en continu, prioritaire sur tout clic)
+    # Sortie de maintenance (déclenchée par n'importe quel clic si dispo)
     # --------------------------------------------------------------------------
     maintenance_quit_button:
       name: 🚪 Bouton "Quitter maintenance"
       description: >
         Si ce bouton est disponible (la litière est en mode maintenance), n'importe quel clic
-        (single/hold/double) le pressera pour sortir de maintenance, avant tout autre mapping.
+        (single/hold/double) le pressera pour sortir de maintenance. L'action mappée à l'étape
+        suivante est ensuite exécutée quand même.
       default: button.petkit_puramax1_maintenance_quitter
       selector:
         entity:
@@ -195,7 +196,7 @@ action:
     default: []
 
   # --------------------------------------------------------------------------
-  # 2) Sortie de maintenance prioritaire, sinon 3) mapping événement → bouton
+  # 2) Sortie de maintenance si disponible (n'empêche plus le mapping ensuite)
   # --------------------------------------------------------------------------
   - choose:
       - conditions:
@@ -212,37 +213,40 @@ action:
             data:
               name: "Petkit"
               message: "Sortie de maintenance déclenchée par un clic ({{ trigger.to_state.state }})."
+    default: []
+
+  # --------------------------------------------------------------------------
+  # 3) Mapping événement → bouton (toujours exécuté, même après sortie de maintenance)
+  # --------------------------------------------------------------------------
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == event_1 and (button_1 | length > 0) }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ button_1 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == event_2 and (button_2 | length > 0) }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ button_2 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == event_3 and (button_3 | length > 0) }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ button_3 }}"
 
     default:
-      - choose:
-          - conditions:
-              - condition: template
-                value_template: "{{ trigger.to_state.state == event_1 and (button_1 | length > 0) }}"
-            sequence:
-              - service: button.press
-                target:
-                  entity_id: "{{ button_1 }}"
-
-          - conditions:
-              - condition: template
-                value_template: "{{ trigger.to_state.state == event_2 and (button_2 | length > 0) }}"
-            sequence:
-              - service: button.press
-                target:
-                  entity_id: "{{ button_2 }}"
-
-          - conditions:
-              - condition: template
-                value_template: "{{ trigger.to_state.state == event_3 and (button_3 | length > 0) }}"
-            sequence:
-              - service: button.press
-                target:
-                  entity_id: "{{ button_3 }}"
-
-        default:
-          - service: logbook.log
-            data:
-              name: "Petkit"
-              message: >
-                Aucune action associée à l'état '{{ trigger.to_state.state }}' ou bouton
-                correspondant non configuré.
+      - service: logbook.log
+        data:
+          name: "Petkit"
+          message: >
+            Aucune action associée à l'état '{{ trigger.to_state.state }}' ou bouton
+            correspondant non configuré.
