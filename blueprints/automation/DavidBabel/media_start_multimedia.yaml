@@ -1,5 +1,5 @@
-# Version: 1.1.6
-# 🧪 to test : update / backup
+# Version: 1.1.9
+# 🧪 to test : add window protection
 # Appartement: Carmes
 #TODO : si source =/= shield, alors ne rien faire
 # Ajouter un bouton pour forcer le scenario d'extinction sur la telecommande et via les webhooks
@@ -7,11 +7,12 @@
 blueprint:
   name: "🎬 Contrôle Cinéma Epson & Shield"
   description: >
-    Version: 1.1.6
+    Version: 1.1.9
     📽️ Allume le projecteur Epson et l’ampli Denon via la Shield ou un bouton Hue,
     et les éteint (double OFF Epson).
 
     Inclut la commande d’un écran de projection (cover) Broadlink (open/close + stop).
+    Inclut une sécurité (capteur obstacle) annulant tout l'allumage si une fenêtre est ouverte.
 
     Conçu pour fonctionner avec les entités `template switch` auto-générées par Broadlink Manager
     (celles qui font déjà `remote.send_command` avec `command: b64:...`).
@@ -33,6 +34,14 @@ blueprint:
         entity:
           filter:
             domain: switch
+    obstacle_sensor:
+      name: "🛑 Capteur obstacle (Fenêtre)"
+      description: "Si ce capteur est ouvert ('on'), tout le scénario d'allumage est ignoré."
+      default: binary_sensor.salon_ouverture_fenetre_salon
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
     # --------------------------------------------------------------------------
     # Ampli Denon (media_player) : lecture de la source courante
     # Type attendu : media_player.xxx (Denon / HEOS)
@@ -242,7 +251,7 @@ action:
                   - action: media_player.turn_off
                     target:
                       entity_id: !input denon_media_player
-                  - delay: "00:00:07"
+                  - delay: "00:00:12"
                   - action: switch.turn_off
                     target:
                       entity_id: !input epson_switch
@@ -275,6 +284,14 @@ action:
           - condition: trigger
             id: "allumage"
         sequence:
+          # ------------------------------------------------------------------------
+          # Sécurité : Si le capteur obstacle est 'on' (fenêtre ouverte),
+          # l'exécution s'arrête ici et n'allume rien.
+          # ------------------------------------------------------------------------
+          - condition: state
+            entity_id: !input obstacle_sensor
+            state: "off"
+
           - parallel:
               - sequence:
                   - action: cover.open_cover

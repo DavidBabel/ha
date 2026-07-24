@@ -16,7 +16,7 @@ _Généré automatiquement par post-commit_
 ✅ `healthcheck_ha_distants.yaml` : # ✅ working
 ✅ `healthcheck_prise_shelly.yaml` : # ✅ working
 ✅ `healthcheck_warning_device_unplug.yaml` : # ✅ working
-🧪 `media_start_multimedia.yaml` : # 🧪 to test : update / backup
+🧪 `media_start_multimedia.yaml` : # 🧪 to test : add window protection
 ✅ `rebooted_ha.yaml` : # ✅ working
 ✅ `security_alerts.yaml` : # ✅ working
 ✅ `security_kill_app.yaml` : # ✅ working
