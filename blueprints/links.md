@@ -6,6 +6,7 @@ https://raw.githubusercontent.com/DavidBabel/ha/master/blueprints/automation/Dav
 https://raw.githubusercontent.com/DavidBabel/ha/master/blueprints/automation/DavidBabel/button_toggle_outlet.yaml
 https://raw.githubusercontent.com/DavidBabel/ha/master/blueprints/automation/DavidBabel/healthcheck_ha_distants.yaml
 https://raw.githubusercontent.com/DavidBabel/ha/master/blueprints/automation/DavidBabel/media_start_multimedia.yaml
+https://raw.githubusercontent.com/DavidBabel/ha/master/blueprints/automation/DavidBabel/sensor_toggle_outlet.yaml
 
 # Appartement: Romains
 https://raw.githubusercontent.com/DavidBabel/ha/master/blueprints/automation/DavidBabel/auto_lights_off.yaml

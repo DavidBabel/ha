@@ -1,0 +1,75 @@
+# Version: 1.0.2
+# 🧪 to test : commit sensor to outlet
+# Appartement: Carmes
+blueprint:
+  name: "Miroir capteur de seuil -> Prise on/off"
+  description: >
+    Allume une prise quand un capteur binaire (ex. un seuil de puissance)
+    passe à "on", et l'éteint quand il repasse à "off". La prise est aussi
+    remise en cohérence au démarrage de Home Assistant.
+  domain: automation
+  input:
+    threshold_sensor:
+      name: Capteur de seuil
+      description: Le capteur binaire (ex. le seuil créé pour ton Mac) à surveiller.
+      selector:
+        entity:
+          domain: binary_sensor
+    target_switch:
+      name: Prise
+      description: La prise on/off à piloter.
+      selector:
+        entity:
+          domain: switch
+
+trigger:
+  - platform: state
+    entity_id: !input threshold_sensor
+    to: "on"
+    id: "seuil_on"
+  - platform: state
+    entity_id: !input threshold_sensor
+    to: "off"
+    id: "seuil_off"
+  - platform: homeassistant
+    event: start
+    id: "ha_start"
+
+condition: []
+
+action:
+  - variables:
+      seuil_etat: >-
+        {{ states(threshold_sensor) }}
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "seuil_on"
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: !input target_switch
+      - conditions:
+          - condition: trigger
+            id: "seuil_off"
+        sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: !input target_switch
+      - conditions:
+          - condition: trigger
+            id: "ha_start"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ seuil_etat == 'on' }}"
+            then:
+              - action: switch.turn_on
+                target:
+                  entity_id: !input target_switch
+            else:
+              - action: switch.turn_off
+                target:
+                  entity_id: !input target_switch
+
+mode: restart
