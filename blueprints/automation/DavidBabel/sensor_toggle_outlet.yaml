@@ -1,5 +1,5 @@
-# Version: 1.0.2
-# 🧪 to test : commit sensor to outlet
+# Version: 1.0.3
+# 🧪 to test : fix
 # Appartement: Carmes
 blueprint:
   name: "Miroir capteur de seuil -> Prise on/off"
@@ -39,6 +39,7 @@ condition: []
 
 action:
   - variables:
+      threshold_sensor: !input threshold_sensor
       seuil_etat: >-
         {{ states(threshold_sensor) }}
   - choose:
