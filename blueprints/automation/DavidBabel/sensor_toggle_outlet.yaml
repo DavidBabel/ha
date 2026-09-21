@@ -1,5 +1,5 @@
-# Version: 1.0.3
-# 🧪 to test : fix
+# Version: 1.0.4
+# 🧪 to test : turn off if mac is lost
 # Appartement: Carmes
 blueprint:
   name: "Miroir capteur de seuil -> Prise on/off"
@@ -31,6 +31,10 @@ trigger:
     entity_id: !input threshold_sensor
     to: "off"
     id: "seuil_off"
+  - platform: state
+    entity_id: !input threshold_sensor
+    to: "unavailable"
+    id: "signal_perdu"
   - platform: homeassistant
     event: start
     id: "ha_start"
@@ -43,6 +47,23 @@ action:
       seuil_etat: >-
         {{ states(threshold_sensor) }}
   - choose:
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.id == 'signal_perdu'
+                 or (trigger.id == 'ha_start'
+                     and seuil_etat in ['unavailable', 'unknown']) }}
+        sequence:
+          - repeat:
+              count: 5
+              sequence:
+                - condition: template
+                  value_template: "{{ states(threshold_sensor) in ['unavailable', 'unknown'] }}"
+                - delay:
+                    minutes: 1
+          - action: switch.turn_off
+            target:
+              entity_id: !input target_switch
       - conditions:
           - condition: trigger
             id: "seuil_on"
@@ -69,6 +90,8 @@ action:
                 target:
                   entity_id: !input target_switch
             else:
+              - condition: template
+                value_template: "{{ seuil_etat == 'off' }}"
               - action: switch.turn_off
                 target:
                   entity_id: !input target_switch
