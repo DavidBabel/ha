@@ -1,26 +1,43 @@
-# Version: 1.0.4
-# 🧪 to test : turn off if mac is lost
+# Version: 1.1.1
+# 🧪 to test : update script prise mac
 # Appartement: Carmes
 blueprint:
   name: "Miroir capteur de seuil -> Prise on/off"
   description: >
     Allume une prise quand un capteur binaire (ex. un seuil de puissance)
-    passe à "on", et l'éteint quand il repasse à "off". La prise est aussi
-    remise en cohérence au démarrage de Home Assistant.
+    passe à "on", et l'éteint quand il repasse à "off" après un délai
+    (annulé si le capteur repasse à "on"). La prise est aussi remise en
+    cohérence au démarrage de Home Assistant.
   domain: automation
   input:
     threshold_sensor:
       name: Capteur de seuil
       description: Le capteur binaire (ex. le seuil créé pour ton Mac) à surveiller.
+      default: binary_sensor.macbook_is_pushing
       selector:
         entity:
           domain: binary_sensor
     target_switch:
       name: Prise
       description: La prise on/off à piloter.
+      default: switch.entree_prise_ventilateur_macbook_outlet
       selector:
         entity:
           domain: switch
+    off_delay:
+      name: Délai avant extinction
+      description: >
+        Temps d'attente (en secondes) après le passage à "off" avant
+        d'éteindre la prise. Si le capteur repasse à "on" pendant ce délai,
+        l'extinction est annulée.
+      default: 60
+      selector:
+        number:
+          min: 0
+          max: 3600
+          step: 5
+          unit_of_measurement: s
+          mode: box
 
 trigger:
   - platform: state
@@ -75,6 +92,11 @@ action:
           - condition: trigger
             id: "seuil_off"
         sequence:
+          # État d'attente : un "on" pendant ce délai relance l'automation (mode: restart) et annule l'extinction
+          - delay:
+              seconds: !input off_delay
+          - condition: template
+            value_template: "{{ states(threshold_sensor) == 'off' }}"
           - action: switch.turn_off
             target:
               entity_id: !input target_switch
