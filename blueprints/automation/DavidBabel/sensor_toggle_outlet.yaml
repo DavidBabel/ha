@@ -1,5 +1,5 @@
-# Version: 1.1.1
-# 🧪 to test : update script prise mac
+# Version: 1.2.1
+# 🧪 to test : update with led colors
 # Appartement: Carmes
 blueprint:
   name: "Miroir capteur de seuil -> Prise on/off"
@@ -7,7 +7,9 @@ blueprint:
     Allume une prise quand un capteur binaire (ex. un seuil de puissance)
     passe à "on", et l'éteint quand il repasse à "off" après un délai
     (annulé si le capteur repasse à "on"). La prise est aussi remise en
-    cohérence au démarrage de Home Assistant.
+    cohérence au démarrage de Home Assistant. Une lumière indique l'état :
+    couleur "charge" quand la prise est allumée, couleur "décharge / idle"
+    quand elle est éteinte.
   domain: automation
   input:
     threshold_sensor:
@@ -38,6 +40,25 @@ blueprint:
           step: 5
           unit_of_measurement: s
           mode: box
+    status_light:
+      name: Lumière d'état
+      description: La lumière associée aux évènements (ex. la LED de l'Atom Lite).
+      default: light.salon_m5_atom_lite_atom_led
+      selector:
+        entity:
+          domain: light
+    charge_color:
+      name: Couleur en charge
+      description: Couleur de la lumière quand la prise est allumée (charge).
+      default: [255, 140, 0]
+      selector:
+        color_rgb: {}
+    idle_color:
+      name: Couleur en décharge / idle
+      description: Couleur de la lumière quand la prise est éteinte (décharge / idle).
+      default: [0, 0, 255]
+      selector:
+        color_rgb: {}
 
 trigger:
   - platform: state
@@ -81,6 +102,11 @@ action:
           - action: switch.turn_off
             target:
               entity_id: !input target_switch
+          - action: light.turn_on
+            target:
+              entity_id: !input status_light
+            data:
+              rgb_color: !input idle_color
       - conditions:
           - condition: trigger
             id: "seuil_on"
@@ -88,6 +114,11 @@ action:
           - action: switch.turn_on
             target:
               entity_id: !input target_switch
+          - action: light.turn_on
+            target:
+              entity_id: !input status_light
+            data:
+              rgb_color: !input charge_color
       - conditions:
           - condition: trigger
             id: "seuil_off"
@@ -100,6 +131,11 @@ action:
           - action: switch.turn_off
             target:
               entity_id: !input target_switch
+          - action: light.turn_on
+            target:
+              entity_id: !input status_light
+            data:
+              rgb_color: !input idle_color
       - conditions:
           - condition: trigger
             id: "ha_start"
@@ -111,11 +147,21 @@ action:
               - action: switch.turn_on
                 target:
                   entity_id: !input target_switch
+              - action: light.turn_on
+                target:
+                  entity_id: !input status_light
+                data:
+                  rgb_color: !input charge_color
             else:
               - condition: template
                 value_template: "{{ seuil_etat == 'off' }}"
               - action: switch.turn_off
                 target:
                   entity_id: !input target_switch
+              - action: light.turn_on
+                target:
+                  entity_id: !input status_light
+                data:
+                  rgb_color: !input idle_color
 
 mode: restart
