@@ -1,5 +1,5 @@
-# Version: 1.2.1
-# 🧪 to test : update with led colors
+# Version: 1.4.1
+# 🧪 to test : add toggle to enable disable led
 # Appartement: Carmes
 blueprint:
   name: "Miroir capteur de seuil -> Prise on/off"
@@ -59,6 +59,33 @@ blueprint:
       default: [0, 0, 255]
       selector:
         color_rgb: {}
+    light_brightness:
+      name: Intensité de la lumière
+      description: Luminosité de la lumière d'état (0 à 255), pour la charge comme pour l'idle.
+      default: 150
+      selector:
+        number:
+          min: 0
+          max: 255
+          step: 1
+          mode: slider
+    control_button:
+      name: Bouton
+      description: Le bouton (capteur binaire) qui bascule l'activation de la lumière.
+      default: binary_sensor.salon_m5_atom_lite_atom_bouton
+      selector:
+        entity:
+          domain: binary_sensor
+    light_toggle:
+      name: Activation de la lumière
+      description: >
+        Aide "basculer" (input_boolean) qui détermine si la lumière d'état
+        doit être allumée. Bascule à chaque appui sur le bouton, et est
+        vérifiée avant chaque mise à jour de la lumière.
+      default: input_boolean.m5_atom_pico_light_toggle
+      selector:
+        entity:
+          domain: input_boolean
 
 trigger:
   - platform: state
@@ -76,6 +103,10 @@ trigger:
   - platform: homeassistant
     event: start
     id: "ha_start"
+  - platform: state
+    entity_id: !input control_button
+    to: "on"
+    id: "bouton_appuye"
 
 condition: []
 
@@ -84,7 +115,19 @@ action:
       threshold_sensor: !input threshold_sensor
       seuil_etat: >-
         {{ states(threshold_sensor) }}
+      charge_color: !input charge_color
+      idle_color: !input idle_color
+      light_toggle: !input light_toggle
   - choose:
+      - conditions:
+          - condition: trigger
+            id: "bouton_appuye"
+        sequence:
+          - action: homeassistant.toggle
+            target:
+              entity_id: !input light_toggle
+          - variables:
+              desired_color: "{{ charge_color if seuil_etat == 'on' else idle_color }}"
       - conditions:
           - condition: template
             value_template: >-
@@ -102,11 +145,8 @@ action:
           - action: switch.turn_off
             target:
               entity_id: !input target_switch
-          - action: light.turn_on
-            target:
-              entity_id: !input status_light
-            data:
-              rgb_color: !input idle_color
+          - variables:
+              desired_color: "{{ idle_color }}"
       - conditions:
           - condition: trigger
             id: "seuil_on"
@@ -114,11 +154,8 @@ action:
           - action: switch.turn_on
             target:
               entity_id: !input target_switch
-          - action: light.turn_on
-            target:
-              entity_id: !input status_light
-            data:
-              rgb_color: !input charge_color
+          - variables:
+              desired_color: "{{ charge_color }}"
       - conditions:
           - condition: trigger
             id: "seuil_off"
@@ -131,11 +168,8 @@ action:
           - action: switch.turn_off
             target:
               entity_id: !input target_switch
-          - action: light.turn_on
-            target:
-              entity_id: !input status_light
-            data:
-              rgb_color: !input idle_color
+          - variables:
+              desired_color: "{{ idle_color }}"
       - conditions:
           - condition: trigger
             id: "ha_start"
@@ -147,21 +181,29 @@ action:
               - action: switch.turn_on
                 target:
                   entity_id: !input target_switch
-              - action: light.turn_on
-                target:
-                  entity_id: !input status_light
-                data:
-                  rgb_color: !input charge_color
+              - variables:
+                  desired_color: "{{ charge_color }}"
             else:
               - condition: template
                 value_template: "{{ seuil_etat == 'off' }}"
               - action: switch.turn_off
                 target:
                   entity_id: !input target_switch
-              - action: light.turn_on
-                target:
-                  entity_id: !input status_light
-                data:
-                  rgb_color: !input idle_color
+              - variables:
+                  desired_color: "{{ idle_color }}"
+  - if:
+      - condition: template
+        value_template: "{{ is_state(light_toggle, 'on') }}"
+    then:
+      - action: light.turn_on
+        target:
+          entity_id: !input status_light
+        data:
+          rgb_color: "{{ desired_color }}"
+          brightness: !input light_brightness
+    else:
+      - action: light.turn_off
+        target:
+          entity_id: !input status_light
 
 mode: restart
