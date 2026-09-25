@@ -1,5 +1,5 @@
-# Version: 1.4.1
-# 🧪 to test : add toggle to enable disable led
+# Version: 1.5.1
+# 🧪 to test : clignottement de la diode
 # Appartement: Carmes
 blueprint:
   name: "Miroir capteur de seuil -> Prise on/off"
@@ -191,6 +191,22 @@ action:
                   entity_id: !input target_switch
               - variables:
                   desired_color: "{{ idle_color }}"
+  - repeat:
+      count: 2
+      sequence:
+        - action: light.turn_on
+          target:
+            entity_id: !input status_light
+          data:
+            rgb_color: "{{ desired_color }}"
+            brightness: 255
+        - delay:
+            seconds: 1
+        - action: light.turn_off
+          target:
+            entity_id: !input status_light
+        - delay:
+            seconds: 1
   - if:
       - condition: template
         value_template: "{{ is_state(light_toggle, 'on') }}"

@@ -20,7 +20,7 @@ _Généré automatiquement par post-commit_
 ✅ `rebooted_ha.yaml` : # ✅ working
 ✅ `security_alerts.yaml` : # ✅ working
 ✅ `security_kill_app.yaml` : # ✅ working
-🧪 `sensor_toggle_outlet.yaml` : # 🧪 to test : add toggle to enable disable led
+🧪 `sensor_toggle_outlet.yaml` : # 🧪 to test : clignottement de la diode
 ✅ `smart_heating_reset.yaml` : # ✅ working
 🧪 `smart_heating_schedule_state_to_vt_preset.yaml` : # 🧪 to test : add min preset to VTs schedule
 ✅ `smart_heating_warning_beacon_forgotten.yaml` : # ✅ working
