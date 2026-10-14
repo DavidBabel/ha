@@ -356,11 +356,10 @@
       const generatorView = [
         '  - title: "🧱 Générateur"',
         '    path: generator',
-        '    icon: mdi:view-dashboard-edit',
         '    type: panel',
         '    cards:',
         '      - type: iframe',
-        '        url: https://davidbabel.github.io/ha/dashboard-generator/',
+        `        url: https://davidbabel.github.io/ha/dashboard-generator/?flat=${apartment}`,
         '        aspect_ratio: 100%'
       ].join('\n');
       views.push(generatorView);
