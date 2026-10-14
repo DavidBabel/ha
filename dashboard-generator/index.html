@@ -352,6 +352,19 @@
         views.push(indentedView);
       });
 
+      // Ajouter en dernier onglet la vue iframe vers le Dashboard Generator
+      const generatorView = [
+        '  - title: "🧱 Générateur"',
+        '    path: generator',
+        '    icon: mdi:view-dashboard-edit',
+        '    type: panel',
+        '    cards:',
+        '      - type: iframe',
+        '        url: https://davidbabel.github.io/ha/dashboard-generator/',
+        '        aspect_ratio: 100%'
+      ].join('\n');
+      views.push(generatorView);
+
       // Construire le mega-dashboard avec "views:" au début
       const megaDashboard = 'views:\n' + views.join('\n');
 
@@ -361,7 +374,7 @@
       // Mettre à jour les remplacements (afficher un résumé)
       const list = document.getElementById('replacementsList');
       list.innerHTML = `<div class="replacement-item">
-        <span class="replacement-after">🏠 Dashboard complet avec ${rooms.length} onglets pour ${apartment}</span>
+        <span class="replacement-after">🏠 Dashboard complet avec ${rooms.length} onglets pièces + 1 onglet générateur pour ${apartment}</span>
       </div>`;
       replacementsSection.classList.add('active');
 
