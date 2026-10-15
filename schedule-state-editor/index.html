@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Éditeur Schedule State - Home Assistant</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+</head>
+
+<body data-theme="dark">
+
+  <!-- Floating Drag Info Tooltip -->
+  <div id="drag-tooltip"></div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <span id="brand-icon"></span>
+      <span>Schedule State Editor</span>
+    </div>
+
+    <!-- Day pills selector -->
+    <div class="day-selector">
+      <button class="day-btn active" data-day="mon">lun.</button>
+      <button class="day-btn" data-day="tue">mar.</button>
+      <button class="day-btn" data-day="wed">mer.</button>
+      <button class="day-btn" data-day="thu">jeu.</button>
+      <button class="day-btn" data-day="fri">ven.</button>
+      <button class="day-btn" data-day="sat">sam.</button>
+      <button class="day-btn" data-day="sun">dim.</button>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="header-actions">
+      <select id="snap-select" class="snap-select" title="Précision magnétique du drag">
+        <option value="5">Snap: 5 min</option>
+        <option value="15" selected>Snap: 15 min</option>
+        <option value="30">Snap: 30 min</option>
+        <option value="60">Snap: 1 heure</option>
+      </select>
+
+      <button id="btn-toggle-split" class="btn" title="Basculer split Côte à côte / Haut-Bas">
+        <span id="split-icon"></span>
+        <span id="split-label">Côte à côte</span>
+      </button>
+
+      <button id="btn-add-room" class="btn btn-primary">
+        <span id="add-room-icon"></span> Ajouter chambre
+      </button>
+
+      <button id="btn-copy-yaml" class="btn">
+        <span id="copy-yaml-icon"></span> Copier YAML
+      </button>
+
+      <button id="btn-reset-demo" class="btn" title="Recharger la configuration d'exemple">
+        <span id="reset-icon"></span> Exemple
+      </button>
+
+      <button id="btn-toggle-theme" class="btn icon-action-btn" title="Basculer thème clair/sombre">
+        <span id="theme-icon"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Container for Visual Editor + YAML Area (Vertical 70% / 30% par défaut) -->
+  <div id="app-container" class="split-vertical">
+    <!-- Visual Editor Pane (70% par défaut) -->
+    <div id="visual-pane">
+      <!-- Generated room cards will appear here -->
+    </div>
+
+    <!-- Draggable Splitter -->
+    <div id="splitter" title="Glisser pour redimensionner"></div>
+
+    <!-- YAML Code Editor Pane (30% par défaut) -->
+    <div id="yaml-pane">
+      <div class="yaml-toolbar">
+        <div class="yaml-title">
+          <span id="yaml-icon"></span>
+          <span>Configuration YAML (schedule_state)</span>
+        </div>
+        <div id="yaml-status" class="yaml-status valid">
+          <span id="status-icon"></span> Synchronisé
+        </div>
+      </div>
+      <textarea id="yaml-textarea" spellcheck="false"
+        placeholder="# Collez votre configuration schedule_state YAML ici..."></textarea>
+    </div>
+  </div>
+
+  <!-- Modal for Period Edit / Manual Time Input -->
+  <div id="period-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="period-modal-title">Régler la période</div>
+        <button class="modal-close-btn" onclick="closeModal('period-modal')">&times;</button>
+      </div>
+
+      <div class="form-group">
+        <label>État souhaité</label>
+        <div class="state-quick-btns">
+          <button type="button" class="state-pill-btn" data-state="comfort">comfort</button>
+          <button type="button" class="state-pill-btn" data-state="eco">eco</button>
+          <button type="button" class="state-pill-btn" data-state="boost">boost</button>
+          <button type="button" class="state-pill-btn" data-state="normal">normal</button>
+          <button type="button" class="state-pill-btn" data-state="sleep">sleep</button>
+          <button type="button" class="state-pill-btn" data-state="frost">frost</button>
+          <button type="button" class="state-pill-btn" data-state="off">off</button>
+        </div>
+        <input type="text" id="modal-period-state" class="form-control" style="margin-top:6px"
+          placeholder="Ou valeur libre (ex: 19 °C, 21 °C, auto)...">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Heure de début</label>
+          <input type="time" id="modal-period-start" class="form-control" step="60" required>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Heure de fin</label>
+          <input type="time" id="modal-period-end" class="form-control" step="60" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Appliquer aussi aux jours :</label>
+        <div class="day-checkboxes">
+          <label class="day-check-label"><input type="checkbox" id="chk-mon" value="mon"> Lun</label>
+          <label class="day-check-label"><input type="checkbox" id="chk-tue" value="tue"> Mar</label>
+          <label class="day-check-label"><input type="checkbox" id="chk-wed" value="wed"> Mer</label>
+          <label class="day-check-label"><input type="checkbox" id="chk-thu" value="thu"> Jeu</label>
+          <label class="day-check-label"><input type="checkbox" id="chk-fri" value="fri"> Ven</label>
+          <label class="day-check-label"><input type="checkbox" id="chk-sat" value="sat"> Sam</label>
+          <label class="day-check-label"><input type="checkbox" id="chk-sun" value="sun"> Dim</label>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="modal-period-delete-btn" class="btn" style="color:var(--danger)">
+          <span id="modal-delete-icon"></span> Supprimer
+        </button>
+        <div style="display:flex; gap:8px">
+          <button type="button" class="btn" onclick="closeModal('period-modal')">Annuler</button>
+          <button type="button" id="modal-period-save-btn" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Room Edit / Icon picker -->
+  <div id="room-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="room-modal-title">Paramètres de la pièce</div>
+        <button class="modal-close-btn" onclick="closeModal('room-modal')">&times;</button>
+      </div>
+
+      <div class="form-group">
+        <label>Nom de la pièce / du capteur</label>
+        <input type="text" id="modal-room-name" class="form-control" placeholder="ex: Chambre Mode">
+      </div>
+
+      <div class="form-group">
+        <label>État par défaut (quand aucune période active)</label>
+        <select id="modal-room-default" class="form-control">
+          <option value="eco">eco</option>
+          <option value="comfort">comfort</option>
+          <option value="boost">boost</option>
+          <option value="normal">normal</option>
+          <option value="sleep">sleep</option>
+          <option value="frost">frost</option>
+          <option value="off">off</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Icône MDI</label>
+        <div class="icon-grid" id="modal-icon-grid">
+          <!-- Icons will be populated dynamically -->
+        </div>
+      </div>
+
+      <div class="modal-actions" style="justify-content: flex-end;">
+        <button type="button" class="btn" onclick="closeModal('room-modal')">Annuler</button>
+        <button type="button" id="modal-room-save-btn" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast">
+    <span id="toast-icon"></span>
+    <span id="toast-msg">Opération effectuée</span>
+  </div>
+
+  <script>
+    /* ==============================================================================
+     * SVG OFFICIELS HOME ASSISTANT (MATERIAL DESIGN ICONS)
+     * ============================================================================== */
+    const MDI_SVG_PATHS = {
+      'mdi:calendar-clock': 'M15,13H16.5V15.82L18.94,17.28L18.19,18.53L15,16.69V13M19,8H5V19H9.67C10.23,20.5 11.45,21.71 13,22.28V24H11V22H5A2,2 0 0,1 3,20V6C3,4.89 3.89,4 5,4H6V2H8V4H16V2H18V4H19A2,2 0 0,1 21,6V13.08C20.4,12.55 19.72,12.16 19,11.92V8M17,12A5,5 0 1,1 12,17A5,5 0 0,1 17,12Z',
+      'mdi:bed': 'M19,7H11V14H3V5H1V20H3V17H21V20H23V11A4,4 0 0,0 19,7M7,13A3,3 0 0,0 10,10A3,3 0 0,0 7,7A3,3 0 0,0 4,10A3,3 0 0,0 7,13Z',
+      'mdi:baby-face-outline': 'M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M8.5,8A1.5,1.5 0 0,0 7,9.5A1.5,1.5 0 0,0 8.5,11A1.5,1.5 0 0,0 10,9.5A1.5,1.5 0 0,0 8.5,8M15.5,8A1.5,1.5 0 0,0 14,9.5A1.5,1.5 0 0,0 15.5,11A1.5,1.5 0 0,0 17,9.5A1.5,1.5 0 0,0 15.5,8M12,14C9.67,14 7.69,15.46 6.89,17.5H17.11C16.31,15.46 14.33,14 12,14Z',
+      'mdi:food-variant': 'M22,17H2V15H22V17M11,5V2H13V5C16.86,5 20,8.14 20,12H4C4,8.14 7.14,5 11,5M2,20H22V22H2V20Z',
+      'mdi:sofa': 'M21,9V7C21,5.9 20.1,5 19,5H5C3.9,5 3,5.9 3,7V9C1.9,9 1,9.9 1,11V15C1,16.1 1.9,17 3,17V19H5V17H19V19H21V17C22.1,17 23,16.1 23,15V11C23,9.9 22.1,9 21,9M19,7V10.2C18.4,9.5 17.5,9 16.5,9H7.5C6.5,9 5.6,9.5 5,10.2V7H19M21,15H3V11C3,10.4 3.4,10 4,10S5,10.4 5,11V13H19V11C19,10.4 19.4,10 20,10S21,10.4 21,11V15Z',
+      'mdi:shower': 'M12,1A9,9 0 0,0 3,10C3,12.7 4.19,15.13 6.1,16.8L4.69,18.22L6.1,19.64L7.5,18.22C8.75,18.72 10.1,19 11.5,19A8.5,8.5 0 0,0 20,10.5C20,9.9 19.9,9.3 19.8,8.8L21.3,7.3L19.9,5.9L18.4,7.4C16.8,3.5 13,1 12,1M12,3C13.5,3 15.3,4.5 16.5,6.8L12.7,10.6C12.5,10.4 12.3,10.2 12,10.2C11.5,10.2 11,10.4 10.6,10.6L6.8,6.8C8,4.5 9.8,3 12,3M8,12A1,1 0 0,1 9,13A1,1 0 0,1 8,14A1,1 0 0,1 7,13A1,1 0 0,1 8,12M12,12A1,1 0 0,1 13,13A1,1 0 0,1 12,14A1,1 0 0,1 11,13A1,1 0 0,1 12,12M16,12A1,1 0 0,1 17,13A1,1 0 0,1 16,14A1,1 0 0,1 15,13A1,1 0 0,1 16,12M6,15A1,1 0 0,1 7,16A1,1 0 0,1 6,17A1,1 0 0,1 5,16A1,1 0 0,1 6,15M10,15A1,1 0 0,1 11,16A1,1 0 0,1 10,17A1,1 0 0,1 9,16A1,1 0 0,1 10,15M14,15A1,1 0 0,1 15,16A1,1 0 0,1 14,17A1,1 0 0,1 13,16A1,1 0 0,1 14,15M18,15A1,1 0 0,1 19,16A1,1 0 0,1 18,17A1,1 0 0,1 17,16A1,1 0 0,1 18,15Z',
+      'mdi:desk': 'M20,18H22V6H2V18H4V8H20V18M14,10H18V12H14V10M14,14H18V16H14V14Z',
+      'mdi:radiator': 'M3,4V6H4V18H3V20H5V18H7V20H9V18H11V20H13V18H15V20H17V18H19V20H21V18H20V6H21V4H19V6H17V4H15V6H13V4H11V6H9V4H7V6H5V4H3M6,8H8V16H6V8M10,8H12V16H10V8M14,8H16V16H14V8M18,8H18.5V16H18V8Z',
+      'mdi:thermostat': 'M15 13V5A3 3 0 0 0 9 5V13A5 5 0 1 0 15 13M12 4A1 1 0 0 1 13 5V8H11V5A1 1 0 0 1 12 4Z',
+      'mdi:home': 'M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z',
+      'mdi:lightbulb': 'M12,2A7,7 0 0,0 5,9C5,11.38 6.19,13.47 8,14.74V17A1,1 0 0,0 9,18H15A1,1 0 0,0 16,17V14.74C17.81,13.47 19,11.38 19,9A7,7 0 0,0 12,2M9,21A1,1 0 0,0 10,22H14A1,1 0 0,0 15,21V20H9V21Z',
+      'mdi:television': 'M21,17H3V5H21M21,3H3A2,2 0 0,0 1,5V17A2,2 0 0,0 3,19H8V21H16V19H21A2,2 0 0,0 23,17V5A2,2 0 0,0 21,3Z',
+      'mdi:fan': 'M12,11A1,1 0 0,0 11,12A1,1 0 0,0 12,13A1,1 0 0,0 13,12A1,1 0 0,0 12,11M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.4,6.5C17.3,7.4 17.5,8.8 17.2,10.1C17,10.6 16.7,11.1 16.2,11.3C15.7,11.5 15.2,11.3 14.8,11C14,10.4 13.5,9.4 13.5,8.4C13.5,7.3 14.1,6.3 15.1,5.8C15.5,5.6 16,6 16.4,6.5Z',
+      'mdi:fire': 'M12,22A8,8 0 0,1 4,14C4,10.92 5.5,8.85 7.07,7.27C7.45,6.89 7.82,6.5 8.16,6.14C8.44,5.83 8.71,5.5 8.95,5.17C10.13,3.58 10.5,2 10.5,2C10.5,2 11.5,3.67 11.23,5.64C12.33,4.46 13.06,3 13.06,3C13.06,3 16,6.5 16,10C16,10.45 15.89,11.24 15.76,11.75C16.89,10.74 17.41,9.47 17.41,9.47C17.41,9.47 20,13 20,16A8,8 0 0,1 12,22Z',
+      'mdi:snowflake': 'M11,14.17V17.09L8.71,15.79L7.71,17.5L11,19.41V22H13V19.41L16.29,17.5L15.29,15.79L13,17.09V14.17L15.5,15.61L16.5,13.88L14.73,12.86L17.86,11.05L16.86,9.32L13,11.55V8H11V11.55L7.14,9.32L6.14,11.05L9.27,12.86L7.5,13.88L8.5,15.61L11,14.17M13,2H11V4.59L7.71,2.69L6.71,4.4L9,5.72V8.64L6.5,7.2L5.5,8.93L7.27,9.95L4.14,11.76L5.14,13.49L9,11.26V13.81L11,12.65V6.91L13,5.75V12.65L15,13.81V11.26L18.86,13.49L19.86,11.76L16.73,9.95L18.5,8.93L17.5,7.2L15,8.64V5.72L17.29,4.4L16.29,2.69L13,4.59V2Z',
+      'mdi:leaf': 'M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L6.66,19.7C7.14,19.87 7.64,20 8,20C19,20 22,3 22,3C21,5 14,5.25 9,6.25C4,7.25 2,11.5 2,13.5C2,15.5 3.75,17.25 3.75,17.25C7,8 17,8 17,8Z',
+      'mdi:plus-box': 'M17,13H13V17H11V13H7V11H11V7H13V11H17M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3Z',
+      'mdi:plus': 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
+      'mdi:content-copy': 'M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z',
+      'mdi:content-paste': 'M19,20H5V4H7V7H17V4H19M12,2A1,1 0 0,1 13,3A1,1 0 0,1 12,4A1,1 0 0,1 11,3A1,1 0 0,1 12,2M19,2H14.82C14.4,0.84 13.3,0 12,0C10.7,0 9.6,0.84 9.18,2H5A2,2 0 0,0 3,4V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V4A2,2 0 0,0 19,2Z',
+      'mdi:calendar-range': 'M9,10H7V12H9V10M13,10H11V12H13V10M17,10H15V12H17V10M19,3H18V1H16V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V8H19V19Z',
+      'mdi:calendar-weekend': 'M19,19H5V8H19M19,3H18V1H16V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M7,10H9V17H7V10M15,10H17V17H15V10Z',
+      'mdi:calendar-sync': 'M19,3H18V1H16V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V8H19V19M12,17A3.5,3.5 0 0,0 15.5,13.5C15.5,12.3 14.9,11.2 14,10.6V9H13.5V11H15.5V10.5C14.7,9.9 13.5,9.5 12,9.5A4,4 0 0,0 8,13.5H9.5A2.5,2.5 0 0,1 12,11C13.4,11 14.5,12.1 14.5,13.5C14.5,14.9 13.4,16 12,16C10.9,16 10,15.3 9.6,14.4L8.2,14.9C8.8,16.2 10.3,17 12,17Z',
+      'mdi:content-duplicate': 'M11,17V7H21V17H11M11,5A2,2 0 0,0 9,7V17A2,2 0 0,0 11,19H21A2,2 0 0,0 23,17V7A2,2 0 0,0 21,5H11M7,9V21H19V23H7A2,2 0 0,1 5,21V9H7M3,13V25H15V27H3A2,2 0 0,1 1,25V13H3Z',
+      'mdi:trash-can-outline': 'M9,3V4H4V6H5V19A2,2 0 0,0 7,21H17A2,2 0 0,0 19,19V6H20V4H15V3H9M7,6H17V19H7V6M9,8V17H11V8H9M13,8V17H15V8H13Z',
+      'mdi:theme-light-dark': 'M7.5,2C5.71,3.15 4.5,5.18 4.5,7.5C4.5,9.82 5.71,11.85 7.53,13C4.46,13 2,10.54 2,7.5A5.5,5.5 0 0,1 7.5,2M19.07,3.5L20.5,4.93L4.93,20.5L3.5,19.07L19.07,3.5M12.89,5.93L11.41,5L9.97,6L10.39,4.32L9.13,3.19L10.84,3L11.5,1.42L12.16,3L13.87,3.19L12.61,4.32L12.89,5.93M17.4,10.6L16.5,9.2L15.6,10.6L14,10.29L14.74,11.75L13.84,13.16L15.46,13L16.36,14.41L16.89,12.86L18.4,12.44L17.4,10.6M12,22A10,10 0 0,1 2,12C2,11.23 2.08,10.47 2.24,9.74C3.12,11.66 5.09,13 7.42,13C10.45,13 12.92,10.53 12.92,7.5C12.92,6.4 12.59,5.38 12.03,4.53C12.68,4.28 13.37,4.12 14.1,4.04C14.04,4.35 14,4.67 14,5C14,8.87 17.13,12 21,12C21.33,12 21.65,11.96 21.96,11.9C21.88,12.63 21.72,13.32 21.47,13.97C20.62,13.41 19.6,13.08 18.5,13.08C15.47,13.08 13,15.55 13,18.58C13,20.91 14.34,22.88 16.26,23.76C15.53,23.92 14.77,24 14,24A10,10 0 0,1 12,22Z',
+      'mdi:view-split-vertical': 'M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M11,19H5V5H11V19M19,19H13V5H19V19Z',
+      'mdi:view-split-horizontal': 'M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,11H5V5H19V11M19,19H5V13H19V19Z',
+      'mdi:check-circle': 'M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z',
+      'mdi:code-braces': 'M8,3A2,2 0 0,0 6,5V9A2,2 0 0,1 4,11H3V13H4A2,2 0 0,1 6,15V19A2,2 0 0,0 8,21H10V19H8V14A2,2 0 0,0 6,12A2,2 0 0,0 8,10V5H10V3M16,3A2,2 0 0,1 18,5V9A2,2 0 0,0 20,11H21V13H20A2,2 0 0,0 18,15V19A2,2 0 0,1 16,21H14V19H16V14A2,2 0 0,1 18,12A2,2 0 0,1 16,10V5H14V3H16Z',
+      'mdi:refresh': 'M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z',
+      'mdi:information': 'M13,9H11V7H13M13,17H11V11H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z'
+    };
+
+    function getHaSvg(iconName, size = 20) {
+      const path = MDI_SVG_PATHS[iconName] || MDI_SVG_PATHS['mdi:bed'];
+      return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="fill:currentColor; display:inline-block; vertical-align:middle; flex-shrink:0;"><path d="${path}"/></svg>`;
+    }
+
+    /* ==============================================================================
+     * CONSTANTES & ÉTAT DE L'APPLICATION
+     * ============================================================================== */
+    const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    const DAY_LABELS = {
+      mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi',
+      fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche'
+    };
+
+    const COMMON_ICONS = [
+      'mdi:bed', 'mdi:baby-face-outline', 'mdi:food-variant', 'mdi:sofa',
+      'mdi:shower', 'mdi:desk', 'mdi:radiator', 'mdi:thermostat',
+      'mdi:home', 'mdi:lightbulb', 'mdi:television', 'mdi:fan'
+    ];
+
+    let currentDay = 'mon';
+    let snapMinutes = 15;
+    let splitMode = 'split-vertical'; // Par défaut VERTICAL (côte à côte : graphique 70%, texte 30%)
+    let internalClipboard = null;
+    let isUpdatingYamlFromUI = false;
+    let isUpdatingUIFromYaml = false;
+    let activeModalContext = null;
+
+    let rooms = [];
+
+    /* ==============================================================================
+     * COULEURS & STYLES DES ÉTATS (Fidèle à Home Assistant schedule-state-card)
+     * ============================================================================== */
+    function getStateStyle(state) {
+      const s = String(state).trim().toLowerCase();
+      if (s === 'comfort') {
+        return { bg: 'var(--state-comfort)', color: 'var(--state-comfort-text)' };
+      }
+      if (s === 'eco') {
+        return {
+          bg: `repeating-linear-gradient(45deg, #303f9f, #303f9f 8px, #3f51b5 8px, #3f51b5 16px)`,
+          color: '#ffffff'
+        };
+      }
+      if (s === 'boost') {
+        return { bg: 'var(--state-boost)', color: 'var(--state-boost-text)' };
+      }
+      if (s === 'normal') {
+        return {
+          bg: `repeating-linear-gradient(45deg, #43a047, #43a047 8px, #4caf50 8px, #4caf50 16px)`,
+          color: '#ffffff'
+        };
+      }
+      if (s === 'sleep') {
+        return { bg: 'var(--state-sleep)', color: 'var(--state-sleep-text)' };
+      }
+      if (s === 'frost') {
+        return { bg: 'var(--state-frost)', color: 'var(--state-frost-text)' };
+      }
+      if (s === 'off') {
+        return { bg: 'var(--state-off)', color: 'var(--state-off-text)' };
+      }
+
+      // Températures
+      const num = parseFloat(s);
+      if (!isNaN(num)) {
+        if (num <= 17) return { bg: '#ff5722', color: '#ffffff' };
+        if (num <= 19) return { bg: '#8e24aa', color: '#ffffff' };
+        if (num <= 21) return { bg: '#e53935', color: '#ffffff' };
+        if (num <= 23) return { bg: '#7cb342', color: '#ffffff' };
+        return { bg: '#00acc1', color: '#ffffff' };
+      }
+
+      return { bg: '#0288d1', color: '#ffffff' };
+    }
+
+    /* ==============================================================================
+     * CONVERSIONS TEMPORELLES
+     * ============================================================================== */
+    function timeToMinutes(str) {
+      if (!str) return 0;
+      const parts = str.split(':');
+      const h = parseInt(parts[0], 10) || 0;
+      const m = parseInt(parts[1], 10) || 0;
+      return h * 60 + m;
+    }
+
+    function minutesToTime(mins) {
+      mins = Math.max(0, Math.min(1439, Math.round(mins)));
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    function formatTimeDisplay(mins) {
+      if (mins >= 1439) return "23:59";
+      return minutesToTime(mins);
+    }
+
+    function snap(mins) {
+      return Math.round(mins / snapMinutes) * snapMinutes;
+    }
+
+    /* ==============================================================================
+     * JEU DE DONNÉES INITIAL
+     * ============================================================================== */
+    function getInitialRooms() {
+      return [
+        {
+          id: 'room_' + Date.now() + '_1',
+          name: 'Chambre Mode',
+          icon: 'mdi:bed',
+          default_state: 'eco',
+          days: {
+            mon: [{ start: 0, end: 480, state: 'comfort' }, { start: 1140, end: 1439, state: 'comfort' }],
+            tue: [{ start: 0, end: 480, state: 'comfort' }, { start: 1140, end: 1439, state: 'comfort' }],
+            wed: [{ start: 0, end: 1439, state: 'comfort' }],
+            thu: [{ start: 0, end: 480, state: 'comfort' }, { start: 1140, end: 1439, state: 'comfort' }],
+            fri: [{ start: 0, end: 480, state: 'comfort' }, { start: 1140, end: 1439, state: 'comfort' }],
+            sat: [{ start: 0, end: 600, state: 'comfort' }, { start: 1140, end: 1439, state: 'comfort' }],
+            sun: [{ start: 0, end: 600, state: 'comfort' }, { start: 1140, end: 1439, state: 'comfort' }]
+          }
+        },
+        {
+          id: 'room_' + Date.now() + '_2',
+          name: 'Bébé Mode',
+          icon: 'mdi:baby-face-outline',
+          default_state: 'eco',
+          days: {
+            mon: [{ start: 480, end: 540, state: 'boost' }, { start: 540, end: 1140, state: 'comfort' }],
+            tue: [{ start: 480, end: 540, state: 'boost' }, { start: 540, end: 1140, state: 'comfort' }],
+            wed: [{ start: 480, end: 540, state: 'boost' }, { start: 540, end: 1140, state: 'comfort' }],
+            thu: [{ start: 480, end: 540, state: 'boost' }, { start: 540, end: 1140, state: 'comfort' }],
+            fri: [{ start: 480, end: 540, state: 'boost' }, { start: 540, end: 1140, state: 'comfort' }],
+            sat: [],
+            sun: []
+          }
+        },
+        {
+          id: 'room_' + Date.now() + '_3',
+          name: 'Cuisine Mode',
+          icon: 'mdi:food-variant',
+          default_state: 'eco',
+          days: {
+            mon: [{ start: 420, end: 480, state: 'comfort' }, { start: 1050, end: 1170, state: 'comfort' }],
+            tue: [{ start: 420, end: 480, state: 'comfort' }, { start: 1050, end: 1170, state: 'comfort' }],
+            wed: [{ start: 420, end: 480, state: 'comfort' }, { start: 690, end: 750, state: 'comfort' }, { start: 1050, end: 1170, state: 'comfort' }],
+            thu: [{ start: 420, end: 480, state: 'comfort' }, { start: 1050, end: 1170, state: 'comfort' }],
+            fri: [{ start: 420, end: 480, state: 'comfort' }, { start: 1050, end: 1170, state: 'comfort' }],
+            sat: [{ start: 600, end: 630, state: 'comfort' }, { start: 750, end: 810, state: 'comfort' }],
+            sun: [{ start: 600, end: 630, state: 'comfort' }, { start: 750, end: 810, state: 'comfort' }]
+          }
+        },
+        {
+          id: 'room_' + Date.now() + '_4',
+          name: 'Salon Mode',
+          icon: 'mdi:sofa',
+          default_state: 'eco',
+          days: {
+            mon: [{ start: 1080, end: 1320, state: 'comfort' }],
+            tue: [{ start: 1080, end: 1320, state: 'comfort' }],
+            wed: [{ start: 1080, end: 1320, state: 'comfort' }],
+            thu: [{ start: 1080, end: 1320, state: 'comfort' }],
+            fri: [{ start: 1080, end: 1320, state: 'comfort' }],
+            sat: [{ start: 600, end: 1320, state: 'comfort' }],
+            sun: [{ start: 600, end: 1320, state: 'comfort' }]
+          }
+        },
+        {
+          id: 'room_' + Date.now() + '_5',
+          name: 'Salle de bains Mode',
+          icon: 'mdi:shower',
+          default_state: 'eco',
+          days: {
+            mon: [{ start: 0, end: 1439, state: 'eco' }],
+            tue: [{ start: 0, end: 1439, state: 'eco' }],
+            wed: [{ start: 0, end: 1439, state: 'eco' }],
+            thu: [{ start: 0, end: 1439, state: 'eco' }],
+            fri: [{ start: 0, end: 1439, state: 'eco' }],
+            sat: [{ start: 0, end: 1439, state: 'eco' }],
+            sun: [{ start: 0, end: 1439, state: 'eco' }]
+          }
+        }
+      ];
+    }
+
+    /* ==============================================================================
+     * GESTION DU RENDU DE L'INTERFACE GRAPHIQUE
+     * ============================================================================== */
+    function renderApp() {
+      const visualPane = document.getElementById('visual-pane');
+      visualPane.innerHTML = '';
+
+      if (rooms.length === 0) {
+        visualPane.innerHTML = `
+          <div style="text-align:center; padding: 40px; color: var(--text-muted);">
+            <div>${getHaSvg('mdi:calendar-clock', 48)}</div>
+            <p style="margin-top:10px; font-size:1.1rem;">Aucun capteur / chambre configuré.</p>
+            <button class="btn btn-primary" onclick="addNewRoom()" style="margin-top:14px;">
+              ${getHaSvg('mdi:plus', 18)} Ajouter une chambre
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      const now = new Date();
+      const currentMinuteNow = now.getHours() * 60 + now.getMinutes();
+      const nowLeftPct = ((currentMinuteNow / 1440) * 100).toFixed(2);
+
+      rooms.forEach((room, roomIndex) => {
+        const roomCard = document.createElement('div');
+        roomCard.className = 'room-card';
+        roomCard.dataset.roomId = room.id;
+
+        const dayEvents = (room.days && room.days[currentDay]) ? room.days[currentDay] : [];
+
+        let currentStateAtNow = room.default_state || 'eco';
+        for (const ev of dayEvents) {
+          if (currentMinuteNow >= ev.start && currentMinuteNow < ev.end) {
+            currentStateAtNow = ev.state;
+            break;
+          }
+        }
+
+        const header = document.createElement('div');
+        header.className = 'room-header';
+        header.innerHTML = `
+          <div class="room-info">
+            <button class="room-icon-btn" onclick="openRoomSettings('${room.id}')" title="Changer l'icône et paramètres">
+              ${getHaSvg(room.icon || 'mdi:bed', 22)}
+            </button>
+            <input type="text" class="room-name-input" value="${escapeHtml(room.name)}" onchange="updateRoomName('${room.id}', this.value)" title="Cliquer pour renommer">
+            <div class="room-default-badge" title="État par défaut pour les plages non programmées">
+              <span>Défaut :</span>
+              <select onchange="updateRoomDefaultState('${room.id}', this.value)">
+                <option value="eco" ${room.default_state === 'eco' ? 'selected' : ''}>eco</option>
+                <option value="comfort" ${room.default_state === 'comfort' ? 'selected' : ''}>comfort</option>
+                <option value="boost" ${room.default_state === 'boost' ? 'selected' : ''}>boost</option>
+                <option value="normal" ${room.default_state === 'normal' ? 'selected' : ''}>normal</option>
+                <option value="sleep" ${room.default_state === 'sleep' ? 'selected' : ''}>sleep</option>
+                <option value="frost" ${room.default_state === 'frost' ? 'selected' : ''}>frost</option>
+                <option value="off" ${room.default_state === 'off' ? 'selected' : ''}>off</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="room-status-badge" title="État actif à cette heure">${currentStateAtNow}</div>
+
+          <div class="room-smart-actions">
+            <button class="icon-action-btn" data-tooltip="Ajouter une période" onclick="openPeriodModal('${room.id}')">
+              ${getHaSvg('mdi:plus', 18)}
+            </button>
+            <button class="icon-action-btn" data-tooltip="Copier le jour (${DAY_LABELS[currentDay]})" onclick="copyDay('${room.id}')">
+              ${getHaSvg('mdi:content-copy', 18)}
+            </button>
+            <button class="icon-action-btn" data-tooltip="Coller sur ce jour" onclick="pasteDay('${room.id}')">
+              ${getHaSvg('mdi:content-paste', 18)}
+            </button>
+            <button class="icon-action-btn" data-tooltip="Appliquer Lun-Ven" onclick="applyToWeekdays('${room.id}')">
+              ${getHaSvg('mdi:calendar-range', 18)}
+            </button>
+            <button class="icon-action-btn" data-tooltip="Appliquer Sam-Dim" onclick="applyToWeekend('${room.id}')">
+              ${getHaSvg('mdi:calendar-weekend', 18)}
+            </button>
+            <button class="icon-action-btn" data-tooltip="Appliquer à TOUTE la semaine" onclick="applyToFullWeek('${room.id}')">
+              ${getHaSvg('mdi:calendar-sync', 18)}
+            </button>
+            <button class="icon-action-btn" data-tooltip="Dupliquer cette chambre" onclick="duplicateRoom('${room.id}')">
+              ${getHaSvg('mdi:content-duplicate', 18)}
+            </button>
+            <button class="icon-action-btn delete" data-tooltip="Supprimer cette chambre" onclick="deleteRoom('${room.id}')">
+              ${getHaSvg('mdi:trash-can-outline', 18)}
+            </button>
+          </div>
+        `;
+        roomCard.appendChild(header);
+
+        // Timeline Row
+        const timelineRow = document.createElement('div');
+        timelineRow.className = 'timeline-row';
+
+        const sigmaBadge = document.createElement('div');
+        sigmaBadge.className = 'sigma-badge';
+        sigmaBadge.textContent = 'Σ';
+        sigmaBadge.title = 'Vue combinée des programmations';
+        timelineRow.appendChild(sigmaBadge);
+
+        const trackContainer = document.createElement('div');
+        trackContainer.className = 'timeline-container';
+
+        const trackWrapper = document.createElement('div');
+        trackWrapper.className = 'timeline-track-wrapper';
+        trackWrapper.dataset.roomId = room.id;
+
+        const defaultBg = document.createElement('div');
+        defaultBg.className = 'timeline-default-bg';
+        const defStyle = getStateStyle(room.default_state || 'eco');
+        defaultBg.style.background = defStyle.bg;
+        defaultBg.textContent = room.default_state || 'eco';
+        trackWrapper.appendChild(defaultBg);
+
+        const grid = document.createElement('div');
+        grid.className = 'timeline-grid';
+        for (let h = 0; h < 24; h++) {
+          const hourCol = document.createElement('div');
+          hourCol.className = 'grid-hour';
+          grid.appendChild(hourCol);
+        }
+        trackWrapper.appendChild(grid);
+
+        const nowLine = document.createElement('div');
+        nowLine.className = 'current-time-line';
+        nowLine.style.left = `${nowLeftPct}%`;
+        trackWrapper.appendChild(nowLine);
+
+        // Événements avec heures début et fin bien visibles sur chaque case générée
+        dayEvents.forEach((ev, evIndex) => {
+          const block = document.createElement('div');
+          block.className = 'timeline-block';
+          block.dataset.roomId = room.id;
+          block.dataset.eventIndex = evIndex;
+
+          const leftPct = (ev.start / 1440) * 100;
+          const widthPct = Math.max(1.2, ((ev.end - ev.start) / 1440) * 100);
+
+          block.style.left = `${leftPct}%`;
+          block.style.width = `${widthPct}%`;
+
+          const style = getStateStyle(ev.state);
+          block.style.background = style.bg;
+          block.style.color = style.color;
+
+          const startTimeStr = minutesToTime(ev.start);
+          const endTimeStr = formatTimeDisplay(ev.end);
+
+          block.innerHTML = `
+            <div class="resize-handle left" title="Ajuster heure début"></div>
+            <span class="block-time-badge start">${startTimeStr}</span>
+            <span class="block-state-title" title="${ev.state} (${startTimeStr} - ${endTimeStr})">${escapeHtml(ev.state)}</span>
+            <span class="block-time-badge end">${endTimeStr}</span>
+            <div class="resize-handle right" title="Ajuster heure fin"></div>
+          `;
+
+          // Clic sur le bloc pour ajuster manuellement avec précision
+          block.addEventListener('click', (e) => {
+            if (e.target.classList.contains('resize-handle')) return;
+            if (block.dataset.preventClick === 'true') {
+              block.dataset.preventClick = 'false';
+              return;
+            }
+            openPeriodModal(room.id, evIndex);
+          });
+
+          initDragAndResize(block, room.id, evIndex, trackWrapper);
+          trackWrapper.appendChild(block);
+        });
+
+        // Clic sur la piste libre pour ajouter avec précision manuelle
+        trackWrapper.addEventListener('click', (e) => {
+          if (e.target.closest('.timeline-block')) return;
+          const rect = trackWrapper.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const clickMinutes = snap(Math.round((clickX / rect.width) * 1440));
+          const startMin = Math.max(0, Math.min(1380, clickMinutes));
+          const endMin = Math.min(1439, startMin + 60);
+
+          openPeriodModal(room.id, null, startMin, endMin);
+        });
+
+        trackContainer.appendChild(trackWrapper);
+
+        const timeAxis = document.createElement('div');
+        timeAxis.className = 'time-axis';
+        timeAxis.innerHTML = `
+          <span>0h</span>
+          <span style="left:25%">6h</span>
+          <span style="left:50%">12h</span>
+          <span style="left:75%">18h</span>
+          <span>24h</span>
+        `;
+        trackContainer.appendChild(timeAxis);
+
+        timelineRow.appendChild(trackContainer);
+        roomCard.appendChild(timelineRow);
+        visualPane.appendChild(roomCard);
+      });
+    }
+
+    /* ==============================================================================
+     * INTERACTIONS DE DRAG & DROP ET REDIMENSIONNEMENT SUR LES BLOCS
+     * ============================================================================== */
+    function initDragAndResize(block, roomId, evIndex, trackWrapper) {
+      const handleLeft = block.querySelector('.resize-handle.left');
+      const handleRight = block.querySelector('.resize-handle.right');
+      const tooltip = document.getElementById('drag-tooltip');
+
+      let mode = null;
+      let startX = 0;
+      let initialStart = 0;
+      let initialEnd = 0;
+      let hasMoved = false;
+
+      function onMouseDown(e, actionType) {
+        e.stopPropagation();
+        mode = actionType;
+        startX = e.clientX;
+        hasMoved = false;
+
+        const room = rooms.find(r => r.id === roomId);
+        if (!room || !room.days[currentDay][evIndex]) return;
+
+        initialStart = room.days[currentDay][evIndex].start;
+        initialEnd = room.days[currentDay][evIndex].end;
+
+        block.classList.add('dragging');
+
+        tooltip.style.display = 'block';
+        updateTooltip(e.clientX, e.clientY, initialStart, initialEnd);
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      }
+
+      function onMouseMove(e) {
+        if (!mode) return;
+        const deltaX = e.clientX - startX;
+        if (Math.abs(deltaX) > 2) hasMoved = true;
+
+        const trackRect = trackWrapper.getBoundingClientRect();
+        const deltaMinutes = (deltaX / trackRect.width) * 1440;
+
+        let newStart = initialStart;
+        let newEnd = initialEnd;
+        const duration = initialEnd - initialStart;
+
+        if (mode === 'drag') {
+          let shiftedStart = snap(initialStart + deltaMinutes);
+          shiftedStart = Math.max(0, Math.min(1439 - duration, shiftedStart));
+          newStart = shiftedStart;
+          newEnd = shiftedStart + duration;
+        } else if (mode === 'resize-left') {
+          newStart = snap(initialStart + deltaMinutes);
+          newStart = Math.max(0, Math.min(initialEnd - snapMinutes, newStart));
+        } else if (mode === 'resize-right') {
+          newEnd = snap(initialEnd + deltaMinutes);
+          newEnd = Math.max(newStart + snapMinutes, Math.min(1439, newEnd));
+        }
+
+        const leftPct = (newStart / 1440) * 100;
+        const widthPct = Math.max(1, ((newEnd - newStart) / 1440) * 100);
+        block.style.left = `${leftPct}%`;
+        block.style.width = `${widthPct}%`;
+
+        const startBadge = block.querySelector('.block-time-badge.start');
+        const endBadge = block.querySelector('.block-time-badge.end');
+        if (startBadge) startBadge.textContent = minutesToTime(newStart);
+        if (endBadge) endBadge.textContent = formatTimeDisplay(newEnd);
+
+        updateTooltip(e.clientX, e.clientY, newStart, newEnd);
+
+        const room = rooms.find(r => r.id === roomId);
+        if (room && room.days[currentDay][evIndex]) {
+          room.days[currentDay][evIndex].start = newStart;
+          room.days[currentDay][evIndex].end = newEnd;
+        }
+      }
+
+      function onMouseUp(e) {
+        if (!mode) return;
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        tooltip.style.display = 'none';
+        block.classList.remove('dragging');
+
+        if (hasMoved) {
+          block.dataset.preventClick = 'true';
+          const room = rooms.find(r => r.id === roomId);
+          if (room) {
+            room.days[currentDay].sort((a, b) => a.start - b.start);
+          }
+          syncYamlFromUI();
+          renderApp();
+        }
+
+        mode = null;
+      }
+
+      function updateTooltip(x, y, startM, endM) {
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y - 12}px`;
+        const dur = endM - startM;
+        const durH = Math.floor(dur / 60);
+        const durM = dur % 60;
+        const durStr = durH > 0 ? `${durH}h${durM > 0 ? String(durM).padStart(2, '0') : ''}` : `${durM}min`;
+        tooltip.textContent = `${minutesToTime(startM)} → ${formatTimeDisplay(endM)} (${durStr})`;
+      }
+
+      block.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('resize-handle')) return;
+        onMouseDown(e, 'drag');
+      });
+
+      handleLeft.addEventListener('mousedown', (e) => onMouseDown(e, 'resize-left'));
+      handleRight.addEventListener('mousedown', (e) => onMouseDown(e, 'resize-right'));
+    }
+
+    /* ==============================================================================
+     * MODALE D'ÉDITION PRÉCISE DE PÉRIODE (SAISIE MANUELLE)
+     * ============================================================================== */
+    function openPeriodModal(roomId, evIndex = null, defaultStart = 420, defaultEnd = 480) {
+      activeModalContext = { roomId, evIndex };
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+
+      const modal = document.getElementById('period-modal');
+      const title = document.getElementById('period-modal-title');
+      const startInput = document.getElementById('modal-period-start');
+      const endInput = document.getElementById('modal-period-end');
+      const stateInput = document.getElementById('modal-period-state');
+      const deleteBtn = document.getElementById('modal-period-delete-btn');
+
+      let currentEvent = null;
+      if (evIndex !== null && room.days[currentDay][evIndex]) {
+        currentEvent = room.days[currentDay][evIndex];
+        title.textContent = `Modifier la période - ${room.name} (${DAY_LABELS[currentDay]})`;
+        startInput.value = minutesToTime(currentEvent.start);
+        endInput.value = minutesToTime(currentEvent.end);
+        stateInput.value = currentEvent.state;
+        deleteBtn.style.display = 'inline-flex';
+      } else {
+        title.textContent = `Ajouter une période - ${room.name} (${DAY_LABELS[currentDay]})`;
+        startInput.value = minutesToTime(defaultStart);
+        endInput.value = minutesToTime(defaultEnd);
+        stateInput.value = 'comfort';
+        deleteBtn.style.display = 'none';
+      }
+
+      document.querySelectorAll('#period-modal .state-pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.state === stateInput.value);
+        btn.onclick = () => {
+          document.querySelectorAll('#period-modal .state-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          stateInput.value = btn.dataset.state;
+        };
+      });
+
+      DAYS.forEach(d => {
+        const chk = document.getElementById(`chk-${d}`);
+        if (chk) chk.checked = (d === currentDay);
+      });
+
+      modal.classList.add('active');
+    }
+
+    document.getElementById('modal-period-save-btn').onclick = () => {
+      if (!activeModalContext) return;
+      const { roomId, evIndex } = activeModalContext;
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+
+      const startVal = document.getElementById('modal-period-start').value;
+      const endVal = document.getElementById('modal-period-end').value;
+      const stateVal = document.getElementById('modal-period-state').value.trim() || 'comfort';
+
+      const startMin = timeToMinutes(startVal);
+      let endMin = timeToMinutes(endVal);
+      if (endMin <= startMin) {
+        if (endVal === "00:00" && startMin > 0) {
+          endMin = 1439;
+        } else {
+          showToast("L'heure de fin doit être supérieure à l'heure de début.");
+          return;
+        }
+      }
+
+      const selectedDays = [];
+      DAYS.forEach(d => {
+        const chk = document.getElementById(`chk-${d}`);
+        if (chk && chk.checked) selectedDays.push(d);
+      });
+
+      if (selectedDays.length === 0) selectedDays.push(currentDay);
+
+      selectedDays.forEach(day => {
+        if (!room.days[day]) room.days[day] = [];
+        if (day === currentDay && evIndex !== null) {
+          room.days[day][evIndex] = { start: startMin, end: endMin, state: stateVal };
+        } else {
+          room.days[day].push({ start: startMin, end: endMin, state: stateVal });
+        }
+        room.days[day].sort((a, b) => a.start - b.start);
+      });
+
+      closeModal('period-modal');
+      renderApp();
+      syncYamlFromUI();
+      showToast("Période enregistrée avec succès.");
+    };
+
+    document.getElementById('modal-period-delete-btn').onclick = () => {
+      if (!activeModalContext || activeModalContext.evIndex === null) return;
+      const { roomId, evIndex } = activeModalContext;
+      const room = rooms.find(r => r.id === roomId);
+      if (room && room.days[currentDay]) {
+        room.days[currentDay].splice(evIndex, 1);
+        closeModal('period-modal');
+        renderApp();
+        syncYamlFromUI();
+        showToast("Période supprimée.");
+      }
+    };
+
+    /* ==============================================================================
+     * MODALE DE CONFIGURATION DE LA PIÈCE & CHOIX D'ICÔNES
+     * ============================================================================== */
+    function openRoomSettings(roomId) {
+      activeModalContext = { roomId };
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+
+      document.getElementById('modal-room-name').value = room.name;
+      document.getElementById('modal-room-default').value = room.default_state || 'eco';
+
+      const grid = document.getElementById('modal-icon-grid');
+      grid.innerHTML = '';
+      COMMON_ICONS.forEach(iconName => {
+        const opt = document.createElement('div');
+        opt.className = `icon-option ${room.icon === iconName ? 'active' : ''}`;
+        opt.innerHTML = getHaSvg(iconName, 24);
+        opt.onclick = () => {
+          document.querySelectorAll('.icon-option').forEach(o => o.classList.remove('active'));
+          opt.classList.add('active');
+          room._tempIcon = iconName;
+        };
+        grid.appendChild(opt);
+      });
+
+      document.getElementById('room-modal').classList.add('active');
+    }
+
+    document.getElementById('modal-room-save-btn').onclick = () => {
+      if (!activeModalContext) return;
+      const room = rooms.find(r => r.id === activeModalContext.roomId);
+      if (room) {
+        room.name = document.getElementById('modal-room-name').value.trim() || 'Chambre Mode';
+        room.default_state = document.getElementById('modal-room-default').value;
+        if (room._tempIcon) room.icon = room._tempIcon;
+        delete room._tempIcon;
+      }
+      closeModal('room-modal');
+      renderApp();
+      syncYamlFromUI();
+      showToast("Paramètres mis à jour.");
+    };
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+      activeModalContext = null;
+    }
+
+    /* ==============================================================================
+     * BOUTONS MALINS & ACTIONS PIÈCES
+     * ============================================================================== */
+    function updateRoomName(roomId, newName) {
+      const room = rooms.find(r => r.id === roomId);
+      if (room) {
+        room.name = newName.trim();
+        syncYamlFromUI();
+      }
+    }
+
+    function updateRoomDefaultState(roomId, newState) {
+      const room = rooms.find(r => r.id === roomId);
+      if (room) {
+        room.default_state = newState;
+        renderApp();
+        syncYamlFromUI();
+      }
+    }
+
+    function addNewRoom() {
+      const newId = 'room_' + Date.now();
+      rooms.push({
+        id: newId,
+        name: `Nouvelle Pièce ${rooms.length + 1} Mode`,
+        icon: 'mdi:bed',
+        default_state: 'eco',
+        days: {
+          mon: [{ start: 420, end: 1320, state: 'comfort' }],
+          tue: [{ start: 420, end: 1320, state: 'comfort' }],
+          wed: [{ start: 420, end: 1320, state: 'comfort' }],
+          thu: [{ start: 420, end: 1320, state: 'comfort' }],
+          fri: [{ start: 420, end: 1320, state: 'comfort' }],
+          sat: [{ start: 540, end: 1320, state: 'comfort' }],
+          sun: [{ start: 540, end: 1320, state: 'comfort' }]
+        }
+      });
+      renderApp();
+      syncYamlFromUI();
+      showToast("Nouvelle pièce ajoutée.");
+    }
+
+    function duplicateRoom(roomId) {
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+      const cloned = JSON.parse(JSON.stringify(room));
+      cloned.id = 'room_' + Date.now();
+      cloned.name = `${room.name} (Copie)`;
+      rooms.push(cloned);
+      renderApp();
+      syncYamlFromUI();
+      showToast(`Pièce "${room.name}" dupliquée.`);
+    }
+
+    function deleteRoom(roomId) {
+      if (!confirm("Voulez-vous vraiment supprimer cette pièce ?")) return;
+      rooms = rooms.filter(r => r.id !== roomId);
+      renderApp();
+      syncYamlFromUI();
+      showToast("Pièce supprimée.");
+    }
+
+    function copyDay(roomId) {
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+      const events = room.days[currentDay] || [];
+      internalClipboard = JSON.parse(JSON.stringify(events));
+      showToast(`Jour ${DAY_LABELS[currentDay]} copié (${events.length} période(s)).`);
+    }
+
+    function pasteDay(roomId) {
+      if (!internalClipboard) {
+        showToast("Aucun jour n'a été copié pour l'instant.");
+        return;
+      }
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+      room.days[currentDay] = JSON.parse(JSON.stringify(internalClipboard));
+      renderApp();
+      syncYamlFromUI();
+      showToast(`Planning collé sur ${DAY_LABELS[currentDay]}.`);
+    }
+
+    function applyToWeekdays(roomId) {
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+      const sourceEvents = JSON.parse(JSON.stringify(room.days[currentDay] || []));
+      ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
+        room.days[d] = JSON.parse(JSON.stringify(sourceEvents));
+      });
+      renderApp();
+      syncYamlFromUI();
+      showToast(`Planning de ${DAY_LABELS[currentDay]} appliqué du Lundi au Vendredi !`);
+    }
+
+    function applyToWeekend(roomId) {
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+      const sourceEvents = JSON.parse(JSON.stringify(room.days[currentDay] || []));
+      ['sat', 'sun'].forEach(d => {
+        room.days[d] = JSON.parse(JSON.stringify(sourceEvents));
+      });
+      renderApp();
+      syncYamlFromUI();
+      showToast(`Planning de ${DAY_LABELS[currentDay]} appliqué à Samedi et Dimanche !`);
+    }
+
+    function applyToFullWeek(roomId) {
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+      const sourceEvents = JSON.parse(JSON.stringify(room.days[currentDay] || []));
+      DAYS.forEach(d => {
+        room.days[d] = JSON.parse(JSON.stringify(sourceEvents));
+      });
+      renderApp();
+      syncYamlFromUI();
+      showToast(`Planning appliqué à TOUTE la semaine pour ${room.name} !`);
+    }
+
+    /* ==============================================================================
+     * SYNCHRONISATION BIDIRECTIONNELLE : UI -> YAML
+     * ============================================================================== */
+    function syncYamlFromUI() {
+      if (isUpdatingUIFromYaml) return;
+      isUpdatingYamlFromUI = true;
+
+      try {
+        const yamlOutput = generateYamlFromRooms(rooms);
+        const textarea = document.getElementById('yaml-textarea');
+        textarea.value = yamlOutput;
+
+        const status = document.getElementById('yaml-status');
+        status.className = 'yaml-status valid';
+        status.innerHTML = `${getHaSvg('mdi:check-circle', 16)} Synchronisé (${rooms.length} capteurs)`;
+      } catch (err) {
+        console.error("Erreur génération YAML:", err);
+      } finally {
+        isUpdatingYamlFromUI = false;
+      }
+    }
+
+    function generateYamlFromRooms(roomList) {
+      const yamlBlocks = [];
+
+      roomList.forEach(room => {
+        const eventMap = new Map();
+
+        DAYS.forEach(day => {
+          const evs = room.days[day] || [];
+          evs.forEach(ev => {
+            const startStr = minutesToTime(ev.start);
+            const endStr = formatTimeDisplay(ev.end);
+            const key = `${startStr}|${endStr}|${ev.state}`;
+
+            if (!eventMap.has(key)) {
+              eventMap.set(key, {
+                start: startStr,
+                end: endStr,
+                state: ev.state,
+                weekdays: []
+              });
+            }
+            eventMap.get(key).weekdays.push(day);
+          });
+        });
+
+        const eventsList = [];
+        eventMap.forEach(item => {
+          const evObj = {
+            start: item.start,
+            end: item.end,
+            state: item.state
+          };
+
+          if (item.weekdays.length > 0) {
+            evObj.condition = {
+              condition: 'time',
+              weekday: item.weekdays
+            };
+          }
+          eventsList.push(evObj);
+        });
+
+        const roomConfig = {
+          platform: 'schedule_state',
+          name: room.name,
+          icon: room.icon || 'mdi:bed',
+          default_state: room.default_state || 'eco',
+          events: eventsList
+        };
+
+        yamlBlocks.push(roomConfig);
+      });
+
+      if (window.jsyaml && window.jsyaml.dump) {
+        return window.jsyaml.dump(yamlBlocks, {
+          indent: 2,
+          lineWidth: -1,
+          noRefs: true
+        });
+      }
+
+      return manualYamlDump(yamlBlocks);
+    }
+
+    function manualYamlDump(blocks) {
+      let out = "";
+      blocks.forEach(b => {
+        out += `- platform: ${b.platform}\n`;
+        out += `  name: "${b.name}"\n`;
+        out += `  icon: ${b.icon}\n`;
+        out += `  default_state: ${b.default_state}\n`;
+        out += `  events:\n`;
+        b.events.forEach(ev => {
+          out += `    - start: "${ev.start}"\n`;
+          out += `      end: "${ev.end}"\n`;
+          out += `      state: ${ev.state}\n`;
+          if (ev.condition && ev.condition.weekday) {
+            out += `      condition:\n`;
+            out += `        condition: time\n`;
+            out += `        weekday: [${ev.condition.weekday.join(', ')}]\n`;
+          }
+        });
+        out += `\n`;
+      });
+      return out;
+    }
+
+    /* ==============================================================================
+     * SYNCHRONISATION BIDIRECTIONNELLE : YAML -> UI
+     * ============================================================================== */
+    function syncUIFromYaml(yamlText) {
+      if (isUpdatingYamlFromUI) return;
+      isUpdatingUIFromYaml = true;
+
+      const status = document.getElementById('yaml-status');
+
+      try {
+        if (!yamlText || !yamlText.trim()) {
+          status.className = 'yaml-status valid';
+          status.innerHTML = `${getHaSvg('mdi:information', 16)} YAML vide`;
+          isUpdatingUIFromYaml = false;
+          return;
+        }
+
+        let parsed = null;
+        if (window.jsyaml && window.jsyaml.load) {
+          parsed = window.jsyaml.load(yamlText);
+        }
+
+        if (!Array.isArray(parsed)) {
+          if (parsed && typeof parsed === 'object') {
+            parsed = [parsed];
+          } else {
+            throw new Error("Le YAML doit être une liste d'entités (- platform: schedule_state)");
+          }
+        }
+
+        const newRooms = [];
+
+        parsed.forEach((item, index) => {
+          if (!item || typeof item !== 'object') return;
+          if (item.platform && item.platform !== 'schedule_state') return;
+
+          const roomId = 'room_' + Date.now() + '_' + index;
+          const roomName = item.name || `Capteur ${index + 1}`;
+          const roomIcon = item.icon || 'mdi:bed';
+          const defaultState = item.default_state || 'eco';
+
+          const daysObj = {
+            mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: []
+          };
+
+          if (Array.isArray(item.events)) {
+            item.events.forEach(ev => {
+              if (!ev || !ev.start || !ev.end) return;
+              const startMin = timeToMinutes(ev.start);
+              const endMin = timeToMinutes(ev.end);
+              const state = ev.state !== undefined ? String(ev.state) : 'comfort';
+
+              let targetDays = DAYS;
+              if (ev.condition && ev.condition.weekday) {
+                const w = ev.condition.weekday;
+                if (Array.isArray(w)) {
+                  targetDays = w.map(d => String(d).trim().toLowerCase());
+                } else if (typeof w === 'string') {
+                  targetDays = [w.trim().toLowerCase()];
+                }
+              }
+
+              targetDays.forEach(day => {
+                if (daysObj[day]) {
+                  daysObj[day].push({ start: startMin, end: endMin, state: state });
+                }
+              });
+            });
+          }
+
+          DAYS.forEach(day => {
+            daysObj[day].sort((a, b) => a.start - b.start);
+          });
+
+          newRooms.push({
+            id: roomId,
+            name: roomName,
+            icon: roomIcon,
+            default_state: defaultState,
+            days: daysObj
+          });
+        });
+
+        rooms = newRooms;
+        renderApp();
+
+        status.className = 'yaml-status valid';
+        status.innerHTML = `${getHaSvg('mdi:check-circle', 16)} Synchronisé (${rooms.length} capteurs)`;
+      } catch (err) {
+        status.className = 'yaml-status error';
+        status.innerHTML = `${getHaSvg('mdi:information', 16)} Erreur YAML : ${escapeHtml(err.message)}`;
+      } finally {
+        isUpdatingUIFromYaml = false;
+      }
+    }
+
+    /* ==============================================================================
+     * GESTION DU SPLITTER (HORIZONTAL & VERTICAL)
+     * ============================================================================== */
+    function initSplitter() {
+      const splitter = document.getElementById('splitter');
+      const visualPane = document.getElementById('visual-pane');
+      const yamlPane = document.getElementById('yaml-pane');
+      const container = document.getElementById('app-container');
+
+      let isDragging = false;
+
+      splitter.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        splitter.classList.add('dragging');
+        document.body.style.cursor = splitMode === 'split-vertical' ? 'col-resize' : 'row-resize';
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const rect = container.getBoundingClientRect();
+
+        if (splitMode === 'split-vertical') {
+          const relativeX = e.clientX - rect.left;
+          const totalWidth = rect.width;
+          const pct = Math.max(20, Math.min(80, (relativeX / totalWidth) * 100));
+          visualPane.style.width = `${pct}%`;
+          yamlPane.style.width = `${100 - pct}%`;
+        } else {
+          const relativeY = e.clientY - rect.top;
+          const totalHeight = rect.height;
+          const pct = Math.max(20, Math.min(80, (relativeY / totalHeight) * 100));
+          visualPane.style.height = `${pct}%`;
+          yamlPane.style.height = `${100 - pct}%`;
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          splitter.classList.remove('dragging');
+          document.body.style.cursor = '';
+        }
+      });
+    }
+
+    function toggleSplitMode() {
+      const container = document.getElementById('app-container');
+      const visualPane = document.getElementById('visual-pane');
+      const yamlPane = document.getElementById('yaml-pane');
+      const iconSpan = document.getElementById('split-icon');
+      const labelSpan = document.getElementById('split-label');
+
+      // Réinitialiser les styles inline
+      visualPane.style.width = '';
+      visualPane.style.height = '';
+      yamlPane.style.width = '';
+      yamlPane.style.height = '';
+
+      if (splitMode === 'split-vertical') {
+        splitMode = 'split-horizontal';
+        container.classList.remove('split-vertical');
+        container.classList.add('split-horizontal');
+        iconSpan.innerHTML = getHaSvg('mdi:view-split-horizontal', 18);
+        labelSpan.textContent = 'Haut / Bas';
+        showToast("Affichage basculé en Haut / Bas.");
+      } else {
+        splitMode = 'split-vertical';
+        container.classList.remove('split-horizontal');
+        container.classList.add('split-vertical');
+        iconSpan.innerHTML = getHaSvg('mdi:view-split-vertical', 18);
+        labelSpan.textContent = 'Côte à côte';
+        showToast("Affichage basculé en Côte à côte (70% / 30%).");
+      }
+    }
+
+    /* ==============================================================================
+     * UTILITAIRES & NOTIFICATIONS
+     * ============================================================================== */
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const msgSpan = document.getElementById('toast-msg');
+      msgSpan.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    /* ==============================================================================
+     * INITIALISATION GLOBALE DE L'APPLICATION
+     * ============================================================================== */
+    window.addEventListener('DOMContentLoaded', () => {
+      // 0. Injection des icônes SVG dans le header et modals
+      document.getElementById('brand-icon').innerHTML = getHaSvg('mdi:calendar-clock', 24);
+      document.getElementById('split-icon').innerHTML = getHaSvg('mdi:view-split-vertical', 18);
+      document.getElementById('add-room-icon').innerHTML = getHaSvg('mdi:plus-box', 18);
+      document.getElementById('copy-yaml-icon').innerHTML = getHaSvg('mdi:content-copy', 18);
+      document.getElementById('reset-icon').innerHTML = getHaSvg('mdi:refresh', 18);
+      document.getElementById('theme-icon').innerHTML = getHaSvg('mdi:theme-light-dark', 18);
+      document.getElementById('yaml-icon').innerHTML = getHaSvg('mdi:code-braces', 18);
+      document.getElementById('status-icon').innerHTML = getHaSvg('mdi:check-circle', 16);
+      document.getElementById('modal-delete-icon').innerHTML = getHaSvg('mdi:trash-can-outline', 18);
+      document.getElementById('toast-icon').innerHTML = getHaSvg('mdi:information', 20);
+
+      // 1. Charger les données par défaut fournies
+      rooms = getInitialRooms();
+
+      // 2. Gestion des boutons des jours
+      document.querySelectorAll('.day-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentDay = btn.dataset.day;
+          renderApp();
+        });
+      });
+
+      // 3. Snap select
+      const snapSelect = document.getElementById('snap-select');
+      snapSelect.addEventListener('change', () => {
+        snapMinutes = parseInt(snapSelect.value, 10) || 15;
+        showToast(`Magnétisme réglé sur ${snapMinutes} minutes.`);
+      });
+
+      // 4. Header buttons
+      document.getElementById('btn-toggle-split').onclick = toggleSplitMode;
+      document.getElementById('btn-add-room').onclick = addNewRoom;
+
+      document.getElementById('btn-copy-yaml').onclick = () => {
+        const textarea = document.getElementById('yaml-textarea');
+        navigator.clipboard.writeText(textarea.value).then(() => {
+          showToast("YAML copié dans le presse-papier !");
+        }).catch(() => {
+          textarea.select();
+          document.execCommand('copy');
+          showToast("YAML copié dans le presse-papier !");
+        });
+      };
+
+      document.getElementById('btn-reset-demo').onclick = () => {
+        if (confirm("Réinitialiser avec la configuration de démonstration ?")) {
+          rooms = getInitialRooms();
+          renderApp();
+          syncYamlFromUI();
+          showToast("Configuration d'exemple rechargée.");
+        }
+      };
+
+      // 5. Thème clair / sombre
+      document.getElementById('btn-toggle-theme').onclick = () => {
+        const current = document.body.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.body.setAttribute('data-theme', next);
+        renderApp();
+      };
+
+      // 6. Textarea YAML -> Live UI sync avec debouncing
+      let debounceTimeout = null;
+      const textarea = document.getElementById('yaml-textarea');
+      textarea.addEventListener('input', () => {
+        clearTimeout(debounceTimeout);
+        debounceTimeout = setTimeout(() => {
+          syncUIFromYaml(textarea.value);
+        }, 350);
+      });
+
+      // 7. Initialiser splitter & vue
+      initSplitter();
+      renderApp();
+      syncYamlFromUI();
+    });
+  </script>
+</body>
+
+</html>
