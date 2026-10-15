@@ -175,7 +175,7 @@
         templateStatus.style.color = '#155724';
         templateStatus.textContent = '✓ Template chargé avec succès !';
         errorMessage.style.display = 'none';
-        apartmentSelect.focus();
+        refreshCurrentSelection();
       };
       reader.onerror = function () {
         showError('Erreur lors de la lecture du fichier');
@@ -183,10 +183,27 @@
       reader.readAsText(file);
     }
 
+    // Rafraîchir la génération selon la sélection courante
+    function refreshCurrentSelection() {
+      updateRadioStyles();
+      const apartment = Array.from(apartmentRadios).find(r => r.checked)?.value || '';
+      if (!apartment || !apartments[apartment]) return;
+
+      const roomRadio = document.querySelector('input[name="room"]:checked');
+      if (!roomRadio || roomRadio.value === 'all') {
+        const roomAllInput = document.getElementById('room_all');
+        if (roomAllInput) roomAllInput.checked = true;
+        updateRadioStyles();
+        generateAllRoomsDashboard(apartment);
+      } else {
+        onRoomChange();
+      }
+    }
+
     // Charger le template automatiquement
     function autoLoadTemplate() {
       // Essayer de charger depuis le serveur
-      fetch('template.yaml')
+      return fetch('template.yaml')
         .then(response => {
           if (!response.ok) throw new Error('Fichier non trouvé');
           return response.text();
@@ -195,6 +212,7 @@
           templateContent = content;
           document.getElementById('templateLoadSection').style.display = 'none';
           errorMessage.style.display = 'none';
+          refreshCurrentSelection();
         })
         .catch(error => {
           // Afficher le formulaire de chargement manuel en cas d'erreur
@@ -203,9 +221,24 @@
         });
     }
 
+    // Mettre à jour les classes de style pour les radios (compatibilité WebView/navigateurs)
+    function updateRadioStyles() {
+      document.querySelectorAll('.radio-option').forEach(option => {
+        const radio = option.querySelector('input[type="radio"]');
+        if (radio && radio.checked) {
+          option.classList.add('selected');
+        } else {
+          option.classList.remove('selected');
+        }
+      });
+    }
+
     // Initialiser les écouteurs
     apartmentRadios.forEach(radio => {
-      radio.addEventListener('change', onApartmentChange);
+      radio.addEventListener('change', () => {
+        updateRadioStyles();
+        onApartmentChange();
+      });
     });
 
     // Faire en sorte que cliquer sur le bouton entier coche la radio
@@ -214,6 +247,7 @@
         if (e.target.tagName !== 'INPUT') {
           const radio = this.querySelector('input[type="radio"]');
           radio.checked = true;
+          updateRadioStyles();
           radio.dispatchEvent(new Event('change', { bubbles: true }));
         }
       });
@@ -241,6 +275,7 @@
           <input type="radio" id="room_all" name="room" value="all" checked>
           <label for="room_all">🏠 Toutes</label>
         `;
+        allRadioOption.querySelector('input[type="radio"]').checked = true;
         roomGroup.appendChild(allRadioOption);
 
         // Ajouter l'écouteur de clic sur le bouton "Toutes"
@@ -282,11 +317,13 @@
           // Ajouter l'écouteur de changement de la radio
           const roomRadio = radioOption.querySelector('input[type="radio"]');
           roomRadio.addEventListener('change', function (e) {
+            updateRadioStyles();
             onRoomChange(e);
           });
         });
 
-        // Générer automatiquement le mega-dashboard (car "Toutes" est coché par défaut)
+        // Mettre à jour les styles et générer automatiquement le mega-dashboard (car "Toutes" est coché par défaut)
+        updateRadioStyles();
         generateAllRoomsDashboard(apartment);
       }
 
@@ -301,7 +338,7 @@
 
     // Générer le mega-dashboard avec toutes les pièces en onglets
     function generateAllRoomsDashboard(apartment) {
-      if (!apartment || !apartments[apartment]) return;
+      if (!apartment || !apartments[apartment] || !templateContent) return;
 
       const rooms = apartments[apartment];
       const views = [];
@@ -401,6 +438,7 @@
 
     // Générer le contenu quand une pièce est sélectionnée
     function onRoomChange(event) {
+      updateRadioStyles();
       const apartment = Array.from(apartmentRadios).find(r => r.checked)?.value || '';
       const roomRadio = document.querySelector('input[name="room"]:checked');
       const roomCode = roomRadio?.value || '';
@@ -458,6 +496,7 @@
 
     // Générer le contenu avec les remplacements
     function generateContent() {
+      if (!templateContent || !currentValues) return;
       let content = templateContent;
       const replacements = [];
 
@@ -635,18 +674,23 @@
     }
 
     // Initialiser au chargement
-    window.addEventListener('DOMContentLoaded', function () {
-      autoLoadTemplate();
+    window.addEventListener('DOMContentLoaded', async function () {
+      await autoLoadTemplate();
 
       // Vérifier les paramètres URL pour présélectionner un appartement
       const urlParams = new URLSearchParams(window.location.search);
-      const selectedFlat = urlParams.get('flat');
+      const selectedFlat = (urlParams.get('flat') || '').toLowerCase();
 
       if (selectedFlat) {
         const radio = document.querySelector(`input[name="apartment"][value="${selectedFlat}"]`);
         if (radio) {
           radio.checked = true;
-          radio.dispatchEvent(new Event('change', { bubbles: true }));
+          onApartmentChange();
+          const roomAll = document.getElementById('room_all');
+          if (roomAll) {
+            roomAll.checked = true;
+            roomAll.click();
+          }
         }
       }
     });
