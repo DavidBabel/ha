@@ -20,7 +20,6 @@ sections:
         entity: climate.chauffage_vt_engel_chambre_nord
         name: 🛌 Nord
         disable_name: false
-        disable_circle: false
         disable_window: false
         disable_autoStartStop: false
         disable_overpowering: false
@@ -40,6 +39,8 @@ sections:
         disable_safety_warning: false
         disable_buttons: false
         disable_power_infos: true
+        grid_options:
+          rows: auto
       - type: tile
         entity: automation.schedule_state_vt_preset_chambre_nord
         vertical: false
@@ -223,7 +224,7 @@ sections:
     column_span: 4
     cards:
       - type: heading
-        heading: Config 🛌 Chambre Sud
+        heading: Config 🛌 Chambre nord
         heading_style: title
       - type: entity
         entity: number.chauffage_vt_engel_chambre_nord_preset_boost_temp
